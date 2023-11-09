@@ -1,16 +1,16 @@
 from datetime import datetime
-from typing import Self
+from pathlib import Path
+from typing import Iterator, Self
 
+import pendulum
 from peewee import Model
 from playhouse.postgres_ext import (
     ArrayField,
     BigIntegerField,
-    BooleanField, CharField,
+    BooleanField,
     DateTimeTZField,
-    DeferredForeignKey,
-    DoubleField,
     ForeignKeyField,
-    IntegerField, JSONField,
+    IntegerField,
     PostgresqlExtDatabase,
     TextField
 )
@@ -142,6 +142,42 @@ class Note(BaseModel):
             if ori is not None:
                 console.log(f'-{key}: {ori}', style='red bold on dark_red')
         return cls.update(note_dict).where(cls.id == note_id).execute()
+
+    def medias(self, filepath: Path = None) -> Iterator[dict]:
+        prefix = f'{self.time:%y-%m-%d}_{self.username}_{self.id}'
+        for sn, url in enumerate(self.pics, start=1):
+            yield {
+                'url': url,
+                'filename': f'{prefix}_{sn}.webp',
+                'filepath': filepath,
+                'xmp_info': self.gen_meta(sn=sn, url=url),
+            }
+
+    def gen_meta(self, sn: str | int = '', url: str = "") -> dict:
+        if (pic_num := len(self.pics)) == 1:
+            assert not sn or int(sn) == 1
+            sn = ""
+        elif sn and pic_num > 9:
+            sn = f"{int(sn):02d}"
+        title = (f'{self.title.strip()}\n{self.desc.strip()} '
+                 f'发布于 {self.ip_location}')
+        xmp_info = {
+            "ImageUniqueID": self.id,
+            "ImageSupplierID": self.user_id,
+            "ImageSupplierName": "RedBook",
+            "ImageCreatorName": self.username,
+            "BlogTitle": title.strip(),
+            "BlogURL": self.url,
+            "DateCreated": (self.time +
+                            pendulum.Duration(microseconds=int(sn or 0))),
+            "SeriesNumber": sn,
+            "URLUrl": url
+        }
+
+        xmp_info["DateCreated"] = xmp_info["DateCreated"].strftime(
+            "%Y:%m:%d %H:%M:%S.%f").strip('0').strip('.')
+        res = {"XMP:" + k: v for k, v in xmp_info.items() if v}
+        return res
 
 
 class UserConfig(BaseModel):
