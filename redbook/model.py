@@ -7,8 +7,9 @@ from peewee import Model
 from playhouse.postgres_ext import (
     ArrayField,
     BigIntegerField,
-    BooleanField,
+    BooleanField, CharField,
     DateTimeTZField,
+    DeferredForeignKey,
     ForeignKeyField,
     IntegerField,
     PostgresqlExtDatabase,
@@ -44,17 +45,48 @@ class BaseModel(Model):
         return super().get(*query, **filters)
 
 
+class UserConfig(BaseModel):
+    user: "User" = DeferredForeignKey("User", unique=True, backref='config')
+    red_id = BigIntegerField(unique=True)
+    username = CharField()
+    age = CharField()
+    description = TextField()
+    homepage = TextField()
+    fstatus = CharField()
+    location = CharField()
+    ip_location = CharField()
+    college = TextField(null=True)
+    note_fetch = BooleanField(default=False)
+    note_fetch_at = DateTimeTZField(null=True)
+    post_at = DateTimeTZField(null=True)
+    photos_num = IntegerField(null=True)
+    folder = CharField(null=True)
+
+    @classmethod
+    def from_id(cls, user_id: int) -> Self:
+        user = User.from_id(user_id, update=True)
+        user_dict = model_to_dict(user)
+        user_dict['user_id'] = user_dict.pop('id')
+        to_insert = {k: v for k, v in user_dict.items()
+                     if k in cls._meta.columns}
+        if cls.get_or_none(user_id=user_id):
+            cls.update(to_insert).where(cls.user_id == user_id).execute()
+        else:
+            cls.insert(to_insert).execute()
+        return cls.get(user_id=user_id)
+
+
 class User(BaseModel):
     id = TextField(primary_key=True, unique=True)
     red_id = BigIntegerField(unique=True)
-    username = TextField()
-    nickname = TextField()
-    age = TextField()
+    username = CharField()
+    nickname = CharField()
+    age = CharField()
     description = TextField()
     homepage = TextField()
-    fstatus = TextField()
-    location = TextField()
-    ip_location = TextField()
+    fstatus = CharField()
+    location = CharField()
+    ip_location = CharField()
     college = TextField(null=True)
     gender = IntegerField()
     follows = IntegerField()
@@ -64,14 +96,14 @@ class User(BaseModel):
     avatar = TextField()
 
     @classmethod
-    def from_id(cls, user_id, update=False) -> Self:
+    def from_id(cls, user_id: str, update=False) -> Self:
         if update or not cls.get_or_none(id=user_id):
             user_dict = get_user_info(user_id)
             cls.upsert(user_dict)
         return cls.get_by_id(user_id)
 
     @classmethod
-    def upsert(cls, user_dict):
+    def upsert(cls, user_dict: dict):
         user_id = user_dict['id']
         if not (model := cls.get_or_none(id=user_id)):
             user_dict['username'] = user_dict['nickname']
@@ -91,13 +123,13 @@ class User(BaseModel):
 class Note(BaseModel):
     id = TextField(primary_key=True, unique=True)
     user = ForeignKeyField(User, backref="notes")
-    username = TextField()
+    username = CharField()
     followed = BooleanField()
     title = TextField()
     desc = TextField()
     time = DateTimeTZField()
     last_update_time = DateTimeTZField()
-    ip_location = TextField()
+    ip_location = CharField()
     at_user = ArrayField(field_class=TextField, null=True)
     topics = ArrayField(field_class=TextField, null=True)
     url = TextField()
@@ -107,7 +139,7 @@ class Note(BaseModel):
     liked_count = IntegerField()
     collected = BooleanField()
     collected_count = IntegerField()
-    type = TextField()
+    type = CharField()
     pic_ids = ArrayField(field_class=TextField)
     pics = ArrayField(field_class=TextField)
 
@@ -180,9 +212,5 @@ class Note(BaseModel):
         return res
 
 
-class UserConfig(BaseModel):
-    pass
-
-
 database.create_tables(
-    [User, Note])
+    [User, UserConfig, Note])

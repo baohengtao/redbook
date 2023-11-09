@@ -1,5 +1,6 @@
 import itertools
 import re
+from typing import Iterator
 
 import pendulum
 
@@ -8,32 +9,28 @@ from redbook.fetcher import fetcher
 from redbook.helper import convert_js_dict_to_py
 
 
-def get_user_info(user_id):
+def get_user_info(user_id: str) -> dict:
     url = f"https://www.xiaohongshu.com/user/profile/{user_id}"
     r = fetcher.get(url)
     info = re.findall(
         r'<script>window.__INITIAL_STATE__=(.*?)</script>', r.text)[0]
     info = convert_js_dict_to_py(info)
     user_info = info['user']['userPageData']
+
     assert user_info.pop('result') == {
         'success': True, 'code': 0, 'message': 'success'}
     assert user_info.pop('tabPublic') == {'collection': False}
-    user = _parse_user(user_info)
-    assert 'id' not in user
-    user['id'] = user_id
-    user['homepage'] = url
-    for key in ['red_id', 'follows', 'fans', 'interaction']:
-        user[key] = int(user[key])
-    keys = ['id', 'red_id', 'nickname', 'age', 'description', 'homepage',
-            'fstatus', 'location', 'ip_location', 'college']
-    user1 = {k: user[k] for k in keys if k in user}
-    user2 = {k: user[k] for k in user if k not in keys}
-    user_sorted = user1 | user2
-    assert user_sorted == user
-    return user_sorted
+
+    assert 'id' not in user_info
+    user_info['id'] = user_id
+
+    assert 'homepage' not in user_info
+    user_info['homepage'] = url
+
+    return _parse_user(user_info)
 
 
-def _parse_user(user_info):
+def _parse_user(user_info: dict) -> dict:
     user = user_info.pop('basicInfo')
     extra_info = user_info.pop('extraInfo')
     assert user | extra_info == extra_info | user
@@ -51,7 +48,9 @@ def _parse_user(user_info):
     assert len(tags) == len(tags_lst)
     assert user | tags == tags | user
     user |= tags
-    assert not user_info
+
+    assert user | user_info == user_info | user
+    user |= user_info
 
     avatar = user.pop('imageb').split('?')[0]
     assert avatar == user.pop('images').split('?')[0]
@@ -67,10 +66,20 @@ def _parse_user(user_info):
     assert 'description' not in user
     user['description'] = user.pop('desc')
 
-    return user
+    for key in ['red_id', 'follows', 'fans', 'interaction']:
+        user[key] = int(user[key])
+
+    keys = ['id', 'red_id', 'nickname', 'age', 'description', 'homepage',
+            'fstatus', 'location', 'ip_location', 'college']
+    user1 = {k: user[k] for k in keys if k in user}
+    user2 = {k: user[k] for k in user if k not in keys}
+    user_sorted = user1 | user2
+    assert user_sorted == user
+
+    return user_sorted
 
 
-def get_user_notes(user_id):
+def get_user_notes(user_id: str) -> Iterator[dict]:
     cursor = ''
     for page in itertools.count(start=1):
         console.log(f'fetching page {page}...')
