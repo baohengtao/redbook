@@ -8,7 +8,6 @@ from playhouse.postgres_ext import (
     ArrayField, BooleanField,
     CharField,
     DateTimeTZField,
-    DeferredForeignKey,
     ForeignKeyField,
     IntegerField,
     PostgresqlExtDatabase,
@@ -45,8 +44,53 @@ class BaseModel(Model):
         return super().get(*query, **filters)
 
 
+class User(BaseModel):
+    id = TextField(primary_key=True, unique=True)
+    red_id = CharField(unique=True)
+    username = CharField()
+    nickname = CharField()
+    age = CharField(null=True)
+    description = TextField()
+    homepage = TextField()
+    followed = BooleanField()
+    location = CharField(null=True)
+    ip_location = CharField()
+    college = TextField(null=True)
+    gender = IntegerField()
+    follows = IntegerField()
+    fans = IntegerField()
+    interaction = IntegerField()
+    profession = TextField(null=True)
+    avatar = TextField()
+
+    @classmethod
+    def from_id(cls, user_id: str, update=False) -> Self:
+        if update or not cls.get_or_none(id=user_id):
+            user_dict = get_user_info(user_id)
+            cls.upsert(user_dict)
+        return cls.get_by_id(user_id)
+
+    @classmethod
+    def upsert(cls, user_dict: dict):
+        user_id = user_dict['id']
+        if not (model := cls.get_or_none(id=user_id)):
+            user_dict['username'] = user_dict['nickname']
+            return cls.insert(user_dict).execute()
+        model_dict = model_to_dict(model)
+
+        for k, v in user_dict.items():
+            assert v or v == 0
+            if v == model_dict[k]:
+                continue
+            console.log(f'+{k}: {v}', style='green bold on dark_green')
+            if (ori := model_dict[k]) is not None:
+                console.log(f'-{k}: {ori}', style='red bold on dark_red')
+        return cls.update(user_dict).where(cls.id == user_id).execute()
+
+
 class UserConfig(BaseModel):
-    user: "User" = DeferredForeignKey("User", unique=True, backref='config')
+    # user: "User" = DeferredForeignKey("User", unique=True, backref='config')
+    user = ForeignKeyField(User, backref="config")
     red_id = CharField(unique=True)
     username = CharField()
     note_fetch = BooleanField(default=False)
@@ -162,50 +206,6 @@ class UserConfig(BaseModel):
             yield from medias
         assert sorted(note_id_order, reverse=True) == note_id_order
         assert sorted(note_time_order, reverse=True) == note_time_order
-
-
-class User(BaseModel):
-    id = TextField(primary_key=True, unique=True)
-    red_id = CharField(unique=True)
-    username = CharField()
-    nickname = CharField()
-    age = CharField(null=True)
-    description = TextField()
-    homepage = TextField()
-    followed = BooleanField()
-    location = CharField(null=True)
-    ip_location = CharField()
-    college = TextField(null=True)
-    gender = IntegerField()
-    follows = IntegerField()
-    fans = IntegerField()
-    interaction = IntegerField()
-    profession = TextField(null=True)
-    avatar = TextField()
-
-    @classmethod
-    def from_id(cls, user_id: str, update=False) -> Self:
-        if update or not cls.get_or_none(id=user_id):
-            user_dict = get_user_info(user_id)
-            cls.upsert(user_dict)
-        return cls.get_by_id(user_id)
-
-    @classmethod
-    def upsert(cls, user_dict: dict):
-        user_id = user_dict['id']
-        if not (model := cls.get_or_none(id=user_id)):
-            user_dict['username'] = user_dict['nickname']
-            return cls.insert(user_dict).execute()
-        model_dict = model_to_dict(model)
-
-        for k, v in user_dict.items():
-            assert v or v == 0
-            if v == model_dict[k]:
-                continue
-            console.log(f'+{k}: {v}', style='green bold on dark_green')
-            if (ori := model_dict[k]) is not None:
-                console.log(f'-{k}: {ori}', style='red bold on dark_red')
-        return cls.update(user_dict).where(cls.id == user_id).execute()
 
 
 class Note(BaseModel):
