@@ -311,5 +311,60 @@ class Note(BaseModel):
         return res
 
 
+class Artist(BaseModel):
+    user = ForeignKeyField(User, unique=True, backref='artist')
+    red_id = CharField(unique=True)
+    username = CharField(index=True)
+    age = IntegerField(null=True)
+    folder = CharField(null=True, default="recent")
+    photos_num = IntegerField(default=0)
+    favor_num = IntegerField(default=0)
+    recent_num = IntegerField(default=0)
+    description = CharField(null=True)
+    homepage = CharField(null=True)
+    followed = BooleanField()
+    location = CharField(null=True)
+    ip_location = CharField()
+    college = TextField(null=True)
+    gender = IntegerField()
+    follows = IntegerField()
+    fans = IntegerField()
+    interaction = IntegerField()
+    added_at = DateTimeTZField(null=True, default=pendulum.now)
+
+    _cache: dict[int, Self] = {}
+
+    class Meta:
+        table_name = "artist"
+
+    @classmethod
+    def from_id(cls, user_id: int) -> Self:
+        if user_id in cls._cache:
+            return cls._cache[user_id]
+        user = User.from_id(user_id)
+        user_dict = model_to_dict(user)
+        user_dict['user_id'] = user_dict.pop('id')
+        user_dict = {k: v for k, v in user_dict.items()
+                     if k in cls._meta.columns}
+        if cls.get_or_none(user_id=user_id):
+            cls.update(user_dict).where(cls.user_id == user_id).execute()
+        else:
+            cls.insert(user_dict).execute()
+        artist = cls.get(user_id=user_id)
+        cls._cache[user_id] = artist
+        return artist
+
+    @property
+    def xmp_info(self):
+        xmp = {
+            "Artist": self.username,
+            "ImageCreatorID": self.homepage,
+            "ImageSupplierID": self.user_id,
+            "ImageSupplierName": "RedBook",
+        }
+
+        return {"XMP:" + k: v for k, v in xmp.items()}
+
+
 database.create_tables(
-    [User, UserConfig, Note])
+    [User, UserConfig, Note, Artist])
