@@ -5,10 +5,24 @@ from pathlib import Path
 from typing import Iterable
 
 import execjs
+import pendulum
 import requests
 from exiftool import ExifToolHelper
 
 from redbook import console
+
+if not (d := Path('/Volumes/Art')).exists():
+    d = Path.home()/'Pictures'
+default_path = d / 'RedBook'
+
+
+def normalize_user_id(user_id: str) -> str:
+    import re
+    user_id = user_id.strip()
+    user_id = user_id.split('?')[0]
+    user_id = user_id.removeprefix('https://www.xiaohongshu.com/user/profile/')
+    assert re.match(r'^[0-9a-z]{24}$', user_id)
+    return user_id
 
 
 def convert_js_dict_to_py(js_dict: str) -> dict:
@@ -101,3 +115,35 @@ def write_xmp(img: Path, tags: dict):
                 style='error')
             img = img.rename(new_img)
         et.set_tags(img, tags, params=params)
+
+
+def logsaver(func):
+    import sys
+    from functools import wraps
+    from inspect import signature
+
+    from rich.terminal_theme import MONOKAI
+    """Decorator to save console log to html file"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        argv = sys.argv
+        argv[0] = Path(argv[0]).name
+        console.log(
+            f" run command  @ {pendulum.now().format('YYYY-MM-DD HH:mm:ss')}")
+        console.log(' '.join(argv))
+        callargs = signature(func).bind(*args, **kwargs).arguments
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            with console.capture():
+                console.print_exception(show_locals=True)
+            raise
+        finally:
+            download_dir: Path = callargs.get('download_dir', default_path)
+            download_dir.mkdir(parents=True, exist_ok=True)
+            time_format = pendulum.now().format('YY-MM-DD_HHmmss')
+            log_file = f"{func.__name__}_{time_format}.html"
+            console.log(f'Saving log to {download_dir / log_file}')
+            console.save_html(download_dir / log_file, theme=MONOKAI)
+
+    return wrapper

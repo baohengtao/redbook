@@ -1,10 +1,18 @@
 import http.cookies
 import os
+import random
+import time
 from pathlib import Path
 
 import execjs
 import requests
 from dotenv import load_dotenv
+
+from redbook import console
+
+NODE_PATH = Path(__file__).resolve().parent.parent
+NODE_PATH /= 'node_modules'
+os.environ['NODE_PATH'] = str(NODE_PATH)
 
 
 def _get_session():
@@ -33,14 +41,18 @@ def _get_session():
 class Fetcher:
     def __init__(self) -> None:
         self.sess = _get_session()
+        self._visit_count = 0
+        self._last_fetch = time.time()
 
     def get(self, url, api='') -> requests.Response:
+        self._pause()
         if not api:
             return self.sess.get(url)
         headers = self.sess.headers | self._get_xs(api)
         return self.sess.get(url+api, headers=headers)
 
     def post(self, url, api, data):
+        self._pause()
         headers = self.sess.headers | self._get_xs(api, data)
         return self.sess.post(url+api, headers=headers, data=data)
 
@@ -50,6 +62,35 @@ class Fetcher:
         js = execjs.compile(open(jsfile, 'r', encoding='utf-8').read())
         ret = js.call('get_xs', api, data, a1)
         return {k.lower(): str(v) for k, v in ret.items()}
+
+    def _pause(self):
+        if self._visit_count == 0:
+            self._visit_count = 1
+            self._last_fetch = time.time()
+            return
+
+        if self._visit_count % 256 == 0:
+            sleep_time = 256
+        elif self._visit_count % 64 == 0:
+            sleep_time = 64
+        elif self._visit_count % 16 == 0:
+            sleep_time = 16
+        else:
+            sleep_time = 1
+        sleep_time *= random.uniform(0.5, 1.5)
+        self._last_fetch += sleep_time
+        if (wait_time := (self._last_fetch-time.time())) > 0:
+            console.log(
+                f'sleep {wait_time:.1f} seconds...(count: {self._visit_count})',
+                style='info')
+        else:
+            console.log(
+                f'no sleeping since more than {sleep_time:.1f} seconds passed'
+                f'(count: {self._visit_count})')
+        while time.time() < self._last_fetch:
+            time.sleep(0.1)
+        self._last_fetch = time.time()
+        self._visit_count += 1
 
 
 fetcher = Fetcher()

@@ -9,7 +9,7 @@ from redbook.fetcher import fetcher
 from redbook.helper import convert_js_dict_to_py
 
 
-def get_user_info(user_id: str) -> dict:
+def get_user_info(user_id: str, parse=True) -> dict:
     url = f"https://www.xiaohongshu.com/user/profile/{user_id}"
     r = fetcher.get(url)
     info = re.findall(
@@ -27,7 +27,7 @@ def get_user_info(user_id: str) -> dict:
     assert 'homepage' not in user_info
     user_info['homepage'] = url
 
-    return _parse_user(user_info)
+    return _parse_user(user_info) if parse else user_info
 
 
 def _parse_user(user_info: dict) -> dict:
@@ -43,7 +43,7 @@ def _parse_user(user_info: dict) -> dict:
     user |= interactions
 
     tags_lst = user_info.pop('tags')
-    tags = {t['tagType']: t['name'] for t in tags_lst}
+    tags = {t['tagType']: t.get('name') for t in tags_lst}
     tags['age'] = tags.pop('info')
     assert len(tags) == len(tags_lst)
     assert user | tags == tags | user
@@ -66,9 +66,10 @@ def _parse_user(user_info: dict) -> dict:
     assert 'description' not in user
     user['description'] = user.pop('desc')
 
-    for key in ['red_id', 'follows', 'fans', 'interaction']:
+    for key in ['follows', 'fans', 'interaction']:
         user[key] = int(user[key])
 
+    user = {k: v for k, v in user.items() if v is not None}
     keys = ['id', 'red_id', 'nickname', 'age', 'description', 'homepage',
             'fstatus', 'location', 'ip_location', 'college']
     user1 = {k: user[k] for k in keys if k in user}
@@ -163,11 +164,28 @@ def _parse_note(note: dict) -> dict:
     note['pics'] = pics
     note['pic_ids'] = [pic.split('/')[-1] for pic in pics]
 
+    if 'video' in note:
+        media = note.pop('video').pop('media')
+        video = media.pop('video')
+        note['video_md5'] = video['md5']
+        stream = {k: v for k, v in media.pop('stream').items() if v}
+        h264 = stream.pop('h264')
+        assert not stream
+        assert len(h264) == 1
+        h264 = h264[0]
+        note['video'] = h264['master_url']
+
+    for k in note:
+        if isinstance(note[k], str):
+            note[k] = note[k].strip()
+    note = {k: v for k, v in note.items() if v not in [None, [], '']}
+
     keys = ['id', 'user_id', 'nickname',   'followed', 'title',
             'desc', 'time', 'last_update_time',
             'ip_location', 'at_user', 'topics', 'url',
             'comment_count', 'share_count', 'liked', 'liked_count',
-            'collected', 'collected_count',
+            'collected', 'collected_count', 'type', 'pic_ids', 'pics',
+            'video', 'video_md5'
             ]
     note1 = {k: note[k] for k in keys if k in note}
     note2 = {k: note[k] for k in note if k not in keys}

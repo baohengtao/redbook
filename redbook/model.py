@@ -18,7 +18,8 @@ from playhouse.postgres_ext import (
 from playhouse.shortcuts import model_to_dict
 
 from redbook import console
-from redbook.page import get_note, get_user_info
+from redbook.helper import download_files
+from redbook.page import get_note, get_user_info, get_user_notes
 
 database = PostgresqlExtDatabase("redbook", host="localhost")
 
@@ -47,13 +48,13 @@ class BaseModel(Model):
 
 class UserConfig(BaseModel):
     user: "User" = DeferredForeignKey("User", unique=True, backref='config')
-    red_id = BigIntegerField(unique=True)
+    red_id = CharField(unique=True)
     username = CharField()
-    age = CharField()
+    age = CharField(null=True)
     description = TextField()
     homepage = TextField()
     fstatus = CharField()
-    location = CharField()
+    location = CharField(null=True)
     ip_location = CharField()
     college = TextField(null=True)
     note_fetch = BooleanField(default=False)
@@ -75,17 +76,99 @@ class UserConfig(BaseModel):
             cls.insert(to_insert).execute()
         return cls.get(user_id=user_id)
 
+    def page(self) -> Iterator[dict]:
+        for note in get_user_notes(self.user_id):
+            assert note.pop('avatar') == self.user.avatar
+            assert note.pop('nick_name') == self.user.nickname
+            assert note.pop('nickname') == self.user.nickname
+            assert note.pop('user_id') == self.user_id
+
+            assert 'title' not in note
+            note['title'] = note.pop('display_title').strip()
+            note['liked_count'] = int(note['liked_count'])
+
+            assert 'id' not in note
+            note['id'] = note.pop('note_id')
+            yield note
+
+    def fetch_note(self, download_dir: Path):
+        if not self.note_fetch:
+            return
+        if self.note_fetch_at:
+            since = pendulum.instance(self.note_fetch_at)
+        else:
+            since = pendulum.from_timestamp(0)
+        msg = f"fetch_at:{since:%y-%m-%d} liked_fetch:"
+        console.rule(f"开始获取 {self.username} 的主页 ({msg})")
+        console.log(self.user)
+        console.log(f"Media Saving: {download_dir}")
+
+        now = pendulum.now()
+        imgs = self._save_notes(since, download_dir)
+        download_files(imgs)
+        console.log(f"{self.username} 📒 获取完毕\n")
+
+        self.note_fetch_at = now
+        self.save()
+
+    def _save_notes(
+            self,
+            since: pendulum.DateTime,
+            download_dir: Path) -> Iterator[dict]:
+        """
+        Save weibo to database and return media info
+        :return: generator of medias to downloads
+        """
+
+        if since < pendulum.now().subtract(years=1):
+            user_root = 'New'
+        elif not self.photos_num:
+            console.log(
+                f'seems {self.username} not processed, using New folder',
+                style='green on dark_green')
+            user_root = 'New'
+        else:
+            user_root = 'User'
+        download_dir = download_dir / user_root / self.username
+
+        console.log(f'fetch notes from {since:%Y-%m-%d}\n')
+        for note_info in self.page():
+            sticky = note_info.pop('sticky')
+            if note := Note.get_or_none(id=note_info['id']):
+                if note.time < since:
+                    if sticky:
+                        console.log("略过置顶笔记...")
+                        continue
+                    else:
+                        console.log(
+                            f"时间 {note.time:%y-%m-%d} 在 {since:%y-%m-%d}之前, "
+                            "获取完毕")
+                        return
+
+            note = Note.from_id(note_info['id'], update=True)
+            assert note.time > since
+            assert note_info.pop('title') in [note.title, note.desc]
+            for k, v in note_info.items():
+                assert getattr(note, k) == v
+
+            medias = list(note.medias(download_dir))
+            console.log(note)
+            console.log(
+                f"Downloading {len(medias)} files to {download_dir}..")
+            console.print()
+            yield from medias
+
 
 class User(BaseModel):
     id = TextField(primary_key=True, unique=True)
-    red_id = BigIntegerField(unique=True)
+    red_id = CharField(unique=True)
     username = CharField()
     nickname = CharField()
-    age = CharField()
+    age = CharField(null=True)
     description = TextField()
     homepage = TextField()
     fstatus = CharField()
-    location = CharField()
+    location = CharField(null=True)
     ip_location = CharField()
     college = TextField(null=True)
     gender = IntegerField()
@@ -125,11 +208,11 @@ class Note(BaseModel):
     user = ForeignKeyField(User, backref="notes")
     username = CharField()
     followed = BooleanField()
-    title = TextField()
-    desc = TextField()
+    title = TextField(null=True)
+    desc = TextField(null=True)
     time = DateTimeTZField()
     last_update_time = DateTimeTZField()
-    ip_location = CharField()
+    ip_location = CharField(null=True)
     at_user = ArrayField(field_class=TextField, null=True)
     topics = ArrayField(field_class=TextField, null=True)
     url = TextField()
@@ -142,6 +225,8 @@ class Note(BaseModel):
     type = CharField()
     pic_ids = ArrayField(field_class=TextField)
     pics = ArrayField(field_class=TextField)
+    video = TextField(null=True)
+    video_md5 = TextField(null=True)
 
     @classmethod
     def from_id(cls, note_id, update=False) -> Self:
@@ -169,7 +254,7 @@ class Note(BaseModel):
                 continue
             if key == 'pics':
                 continue
-            assert key != 'pic_ids'
+            assert key not in ['pic_ids', 'video', 'video_md5']
             console.log(f'+{key}: {value}', style='green bold on dark_green')
             if ori is not None:
                 console.log(f'-{key}: {ori}', style='red bold on dark_red')
@@ -184,6 +269,13 @@ class Note(BaseModel):
                 'filepath': filepath,
                 'xmp_info': self.gen_meta(sn=sn, url=url),
             }
+        if self.video:
+            yield {
+                'url': self.video,
+                'filename': f'{prefix}.mp4',
+                'filepath': filepath,
+                'xmp_info': self.gen_meta(url=self.video),
+            }
 
     def gen_meta(self, sn: str | int = '', url: str = "") -> dict:
         if (pic_num := len(self.pics)) == 1:
@@ -191,8 +283,9 @@ class Note(BaseModel):
             sn = ""
         elif sn and pic_num > 9:
             sn = f"{int(sn):02d}"
-        title = (f'{self.title.strip()}\n{self.desc.strip()} '
-                 f'发布于 {self.ip_location}')
+        title = f"{self.title or ''}\n{self.desc or ''}".strip()
+        if self.ip_location:
+            title += f' 发布于{self.ip_location}'.strip()
         xmp_info = {
             "ImageUniqueID": self.id,
             "ImageSupplierID": self.user_id,
