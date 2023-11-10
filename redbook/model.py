@@ -5,9 +5,8 @@ from typing import Iterator, Self
 import pendulum
 from peewee import Model
 from playhouse.postgres_ext import (
-    ArrayField,
-    BigIntegerField,
-    BooleanField, CharField,
+    ArrayField, BooleanField,
+    CharField,
     DateTimeTZField,
     DeferredForeignKey,
     ForeignKeyField,
@@ -50,15 +49,15 @@ class UserConfig(BaseModel):
     user: "User" = DeferredForeignKey("User", unique=True, backref='config')
     red_id = CharField(unique=True)
     username = CharField()
+    note_fetch = BooleanField(default=False)
+    note_fetch_at = DateTimeTZField(null=True)
     age = CharField(null=True)
     description = TextField()
     homepage = TextField()
-    fstatus = CharField()
+    followed = BooleanField()
     location = CharField(null=True)
     ip_location = CharField()
     college = TextField(null=True)
-    note_fetch = BooleanField(default=False)
-    note_fetch_at = DateTimeTZField(null=True)
     post_at = DateTimeTZField(null=True)
     photos_num = IntegerField(null=True)
     folder = CharField(null=True)
@@ -132,6 +131,7 @@ class UserConfig(BaseModel):
         download_dir = download_dir / user_root / self.username
 
         console.log(f'fetch notes from {since:%Y-%m-%d}\n')
+        note_id_order, note_time_order = [], []
         for note_info in self.page():
             sticky = note_info.pop('sticky')
             if note := Note.get_or_none(id=note_info['id']):
@@ -143,13 +143,16 @@ class UserConfig(BaseModel):
                         console.log(
                             f"时间 {note.time:%y-%m-%d} 在 {since:%y-%m-%d}之前, "
                             "获取完毕")
-                        return
+                        break
 
             note = Note.from_id(note_info['id'], update=True)
             assert note.time > since
             assert note_info.pop('title') in [note.title, note.desc]
             for k, v in note_info.items():
                 assert getattr(note, k) == v
+            if not sticky:
+                note_id_order.append(note.id)
+                note_time_order.append(note.time)
 
             medias = list(note.medias(download_dir))
             console.log(note)
@@ -157,6 +160,8 @@ class UserConfig(BaseModel):
                 f"Downloading {len(medias)} files to {download_dir}..")
             console.print()
             yield from medias
+        assert sorted(note_id_order, reverse=True) == note_id_order
+        assert sorted(note_time_order, reverse=True) == note_time_order
 
 
 class User(BaseModel):
@@ -167,7 +172,7 @@ class User(BaseModel):
     age = CharField(null=True)
     description = TextField()
     homepage = TextField()
-    fstatus = CharField()
+    followed = BooleanField()
     location = CharField(null=True)
     ip_location = CharField()
     college = TextField(null=True)
@@ -236,6 +241,7 @@ class Note(BaseModel):
             user: User = User.get_by_id(note_dict['user_id'])
             assert note_dict.pop('avatar') == user.avatar
             assert note_dict.pop('nickname') == user.nickname
+            assert note_dict['followed'] == user.followed
             note_dict['username'] = user.username
             cls.upsert(note_dict)
         return cls.get_by_id(note_id)

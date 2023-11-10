@@ -19,7 +19,6 @@ def get_user_info(user_id: str, parse=True) -> dict:
 
     assert user_info.pop('result') == {
         'success': True, 'code': 0, 'message': 'success'}
-    assert user_info.pop('tabPublic') == {'collection': False}
 
     assert 'id' not in user_info
     user_info['id'] = user_id
@@ -31,6 +30,7 @@ def get_user_info(user_id: str, parse=True) -> dict:
 
 
 def _parse_user(user_info: dict) -> dict:
+    #
     user = user_info.pop('basicInfo')
     extra_info = user_info.pop('extraInfo')
     assert user | extra_info == extra_info | user
@@ -69,9 +69,19 @@ def _parse_user(user_info: dict) -> dict:
     for key in ['follows', 'fans', 'interaction']:
         user[key] = int(user[key])
 
+    assert 'followed' not in user
+    if (fstatus := user.pop('fstatus')) == 'follows':
+        user['followed'] = True
+        assert user.pop('tabPublic') == {'collection': False}
+    else:
+        assert fstatus == 'none'
+        user['followed'] = False
+        assert user.pop('tabPublic') == {'collection': True}
+
     user = {k: v for k, v in user.items() if v is not None}
+
     keys = ['id', 'red_id', 'nickname', 'age', 'description', 'homepage',
-            'fstatus', 'location', 'ip_location', 'college']
+            'followed', 'location', 'ip_location', 'college']
     user1 = {k: user[k] for k in keys if k in user}
     user2 = {k: user[k] for k in user if k not in keys}
     user_sorted = user1 | user2
@@ -101,6 +111,10 @@ def get_user_notes(user_id: str) -> Iterator[dict]:
             yield note
         assert not data
         if not has_more:
+            console.log(
+                f"seems reached end at page {page} for {url+api} "
+                "since not has_more",
+                style='warning')
             break
         assert cursor
 
