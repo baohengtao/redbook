@@ -1,4 +1,5 @@
 import json
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -118,20 +119,12 @@ def write_xmp(img: Path, tags: dict):
 
 
 def logsaver(func):
-    import sys
     from functools import wraps
     from inspect import signature
 
-    from rich.terminal_theme import MONOKAI
     """Decorator to save console log to html file"""
     @wraps(func)
     def wrapper(*args, **kwargs):
-        argv = sys.argv
-        argv[0] = Path(argv[0]).name
-        console.log(
-            f" run command  @ {pendulum.now().format('YYYY-MM-DD HH:mm:ss')}")
-        console.log(' '.join(argv))
-        callargs = signature(func).bind(*args, **kwargs).arguments
         try:
             return func(*args, **kwargs)
         except Exception:
@@ -139,11 +132,24 @@ def logsaver(func):
                 console.print_exception(show_locals=True)
             raise
         finally:
+            callargs = signature(func).bind(*args, **kwargs).arguments
             download_dir: Path = callargs.get('download_dir', default_path)
-            download_dir.mkdir(parents=True, exist_ok=True)
-            time_format = pendulum.now().format('YY-MM-DD_HHmmss')
-            log_file = f"{func.__name__}_{time_format}.html"
-            console.log(f'Saving log to {download_dir / log_file}')
-            console.save_html(download_dir / log_file, theme=MONOKAI)
-
+            save_log(func.__name__, download_dir)
     return wrapper
+
+
+def print_command():
+    argv = sys.argv
+    argv[0] = Path(argv[0]).name
+    console.log(
+        f" run command  @ {pendulum.now().format('YYYY-MM-DD HH:mm:ss')}")
+    console.log(' '.join(argv))
+
+
+def save_log(func_name, download_dir):
+    from rich.terminal_theme import MONOKAI
+    download_dir.mkdir(parents=True, exist_ok=True)
+    time_format = pendulum.now().format('YY-MM-DD_HHmmss')
+    log_file = f"{func_name}_{time_format}.html"
+    console.log(f'Saving log to {download_dir / log_file}')
+    console.save_html(download_dir / log_file, theme=MONOKAI)

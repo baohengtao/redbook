@@ -76,7 +76,7 @@ class Fetcher:
             except requests.exceptions.HTTPError as e:
                 period = 60
                 console.log(
-                    f"{e}: Sleepping {period} seconds and "
+                    f"{e}: Sleeping {period} seconds and "
                     f"retry [link={url}]{url}[/link]...", style='error')
                 time.sleep(period)
             else:

@@ -8,7 +8,11 @@ from rich.prompt import Confirm, Prompt
 from typer import Option, Typer
 
 from redbook import console
-from redbook.helper import default_path, logsaver, normalize_user_id
+from redbook.helper import (
+    default_path, logsaver,
+    normalize_user_id,
+    print_command, save_log
+)
 from redbook.model import UserConfig
 
 app = Typer()
@@ -16,31 +20,16 @@ app = Typer()
 
 @app.command(help="Loop through users in database and fetch weibos")
 @logsaver
-def user_loop(download_dir: Path = default_path,
-              frequency: float = 3,
+def user_loop(frequency: float = 24,
+              download_dir: Path = default_path,
               update_note: bool = Option(
                   False, "--update-note", "-u", help="Update note of user")
               ):
-    fetching_time = pendulum.now()
+    WORKING_TIME = 60
+    save_log_at = time.time() - 3600*24
     while True:
+        print_command()
         update_user_config()
-        while pendulum.now() < fetching_time:
-            # sleeping for  600 seconds while listing for enter key
-            if select.select([sys.stdin], [], [], 600)[0]:
-                match (input()):
-                    case "":
-                        console.log(
-                            "Enter key pressed. continuing immediately.")
-                        break
-                    case "q":
-                        console.log("q pressed. exiting.")
-                        return
-                    case _:
-                        console.log(
-                            "Press enter to fetching immediately,\n"
-                            "Q to exit,\n"
-                        )
-                        continue
         start_time = time.time()
         for user in (UserConfig.select()
                      .where(UserConfig.note_fetch)
@@ -50,10 +39,44 @@ def user_loop(download_dir: Path = default_path,
         )):
             config = UserConfig.from_id(user_id=user.user_id)
             config.fetch_note(download_dir, update_note=update_note)
-            if time.time() > start_time + 600:
+            if (work_time := (time.time() - start_time)) > WORKING_TIME:
+                console.log(
+                    f'have been working for {work_time:.0f} seconds,'
+                    f'which is more than {WORKING_TIME}, taking a break')
                 break
+        if time.time() - save_log_at > 3600*5:
+            save_log('user_loop', download_dir)
+            save_log_at = time.time()
+
         fetching_time = pendulum.now().add(hours=frequency)
         console.log(f'waiting for next fetching at {fetching_time:%H:%M:%S}')
+        console.log(
+            "Press S to fetching immediately,\n"
+            "L to save log,\n"
+            "Q to exit,\n"
+        )
+        while pendulum.now() < fetching_time:
+            # sleeping for  600 seconds while listing for enter key
+            if select.select([sys.stdin], [], [], 600)[0]:
+                match (input().lower()):
+                    case "s":
+                        console.log(
+                            "S pressed. continuing immediately.")
+                        break
+                    case "q":
+                        console.log("Q pressed. exiting.")
+                        return
+                    case "l":
+                        save_log('user_loop', download_dir)
+                        save_log_at = time.time()
+                        console.log(
+                            f'waiting for next fetching at {fetching_time:%H:%M:%S}')
+                    case _:
+                        console.log(
+                            "Press S to fetching immediately,\n"
+                            "L to save log,\n"
+                            "Q to exit,\n"
+                        )
 
 
 @app.command(help='Add user to database of users whom we want to fetch from')

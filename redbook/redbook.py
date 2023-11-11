@@ -141,7 +141,11 @@ def get_note(note_id, parse=True):
     note = item.pop('note_card')
     note['url'] = f'https://www.xiaohongshu.com/explore/{note_id}'
     assert item == {'id': note_id, 'model_type': 'note'}
-    return _parse_note(note) if parse else note
+    try:
+        return _parse_note(note) if parse else note
+    except AssertionError:
+        console.log(note['url'], style='error')
+        raise
 
 
 def _parse_note(note: dict) -> dict:
@@ -169,12 +173,17 @@ def _parse_note(note: dict) -> dict:
             tag_list.append(t)
     tags = {t['name']: t['type'] for t in tag_list}
     assert len(tags) == len(tag_list)
-    assert set(tags.values()) == {'topic'} or not tags
+    assert set(tags.values()).issubset(
+        {'topic', 'buyable_goods', 'brand_page',
+         'interact_pk', 'interact_vote', 'moment'})
     assert 'topics' not in note
-    note['topics'] = list(tags.keys())
+    note['topics'] = [k for k, v in tags.items() if v == 'topic']
 
     assert 'at_user' not in note
-    at_user_list = note.pop('at_user_list')
+    at_user_list = []
+    for a in note.pop('at_user_list'):
+        if a not in at_user_list:
+            at_user_list.append(a)
     at_user = {user['nickname']: user['user_id'] for user in at_user_list}
     assert len(at_user) == len(at_user_list)
     note['at_user'] = at_user
@@ -197,7 +206,8 @@ def _parse_note(note: dict) -> dict:
         # video = media.pop('video')
         # note['video_md5'] = video['md5']
         stream = {k: v for k, v in stream.items() if v}
-        h264 = stream.pop('h264')
+        key, h264 = stream.popitem()
+        assert key in ['h264', 'h265']
         assert not stream
         assert len(h264) == 1
         h264 = h264[0]
