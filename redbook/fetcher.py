@@ -49,12 +49,39 @@ class Fetcher:
         if not api:
             return self.sess.get(url)
         headers = self.sess.headers | self._get_xs(api)
-        return self.sess.get(url+api, headers=headers)
+        url += api
+        while True:
+            try:
+                r = self.sess.get(url, headers=headers)
+                r.raise_for_status()
+            except (requests.exceptions.ConnectionError,
+                    requests.exceptions.HTTPError) as e:
+                period = 60
+                console.log(
+                    f"{e}: Sleepping {period} seconds and "
+                    f"retry [link={url}]{url}[/link]...", style='error')
+                time.sleep(period)
+            else:
+                assert r.status_code != 503
+                return r
 
     def post(self, url, api, data):
         self._pause()
         headers = self.sess.headers | self._get_xs(api, data)
-        return self.sess.post(url+api, headers=headers, data=data)
+        url += api
+        while True:
+            r = self.sess.post(url, headers=headers, data=data)
+            try:
+                r.raise_for_status()
+            except requests.exceptions.HTTPError as e:
+                period = 60
+                console.log(
+                    f"{e}: Sleepping {period} seconds and "
+                    f"retry [link={url}]{url}[/link]...", style='error')
+                time.sleep(period)
+            else:
+                assert r.status_code != 503
+                return r
 
     def _get_xs(self, api, data=''):
         a1 = self.sess.cookies.get('a1')
@@ -75,9 +102,11 @@ class Fetcher:
             sleep_time = 64
         elif self._visit_count % 16 == 0:
             sleep_time = 16
+        elif self._visit_count % 4 == 0:
+            sleep_time = 4
         else:
             sleep_time = 1
-        sleep_time *= random.uniform(0.5, 1.5)
+        sleep_time *= random.uniform(0.5, 1.5) * 4
         self._last_fetch += sleep_time
         if (wait_time := (self._last_fetch-time.time())) > 0:
             console.log(

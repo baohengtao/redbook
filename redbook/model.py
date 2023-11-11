@@ -9,7 +9,7 @@ from playhouse.postgres_ext import (
     CharField,
     DateTimeTZField,
     ForeignKeyField,
-    IntegerField,
+    IntegerField, JSONField,
     PostgresqlExtDatabase,
     TextField
 )
@@ -50,7 +50,7 @@ class User(BaseModel):
     username = CharField()
     nickname = CharField()
     age = CharField(null=True)
-    description = TextField()
+    description = TextField(null=True)
     homepage = TextField()
     followed = BooleanField()
     location = CharField(null=True)
@@ -60,7 +60,8 @@ class User(BaseModel):
     follows = IntegerField()
     fans = IntegerField()
     interaction = IntegerField()
-    profession = TextField(null=True)
+    profession = ArrayField(field_class=TextField, null=True)
+    collection_public = BooleanField()
     avatar = TextField()
 
     @classmethod
@@ -93,10 +94,10 @@ class UserConfig(BaseModel):
     user = ForeignKeyField(User, backref="config")
     red_id = CharField(unique=True)
     username = CharField()
-    note_fetch = BooleanField(default=False)
+    note_fetch = BooleanField(default=True)
     note_fetch_at = DateTimeTZField(null=True)
     age = CharField(null=True)
-    description = TextField()
+    description = TextField(null=True)
     homepage = TextField()
     followed = BooleanField()
     location = CharField(null=True)
@@ -152,6 +153,7 @@ class UserConfig(BaseModel):
         console.log(f"{self.username} 📒 获取完毕\n")
 
         self.note_fetch_at = now
+        self.post_at = self.user.notes.order_by(Note.time.desc()).first().time
         self.save()
 
     def _save_notes(
@@ -191,7 +193,9 @@ class UserConfig(BaseModel):
 
             note = Note.from_id(note_info['id'], update=True)
             assert note.time > since
-            assert note_info.pop('title') in [note.title, note.desc]
+            if (t := note_info.pop('title')) not in [note.title, note.desc]:
+                console.log(f"note_info['display_title]{t} not in "
+                            f"{[note.title, note.desc]}", style='warning')
             for k, v in note_info.items():
                 assert getattr(note, k) == v
             if not sticky:
@@ -218,7 +222,7 @@ class Note(BaseModel):
     time = DateTimeTZField()
     last_update_time = DateTimeTZField()
     ip_location = CharField(null=True)
-    at_user = ArrayField(field_class=TextField, null=True)
+    at_user = JSONField(null=True)
     topics = ArrayField(field_class=TextField, null=True)
     url = TextField()
     comment_count = IntegerField()
@@ -231,7 +235,6 @@ class Note(BaseModel):
     pic_ids = ArrayField(field_class=TextField)
     pics = ArrayField(field_class=TextField)
     video = TextField(null=True)
-    video_md5 = TextField(null=True)
 
     @classmethod
     def from_id(cls, note_id, update=False) -> Self:
@@ -320,7 +323,7 @@ class Artist(BaseModel):
     photos_num = IntegerField(default=0)
     favor_num = IntegerField(default=0)
     recent_num = IntegerField(default=0)
-    description = CharField(null=True)
+    description = TextField(null=True)
     homepage = CharField(null=True)
     followed = BooleanField()
     location = CharField(null=True)

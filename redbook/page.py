@@ -43,9 +43,14 @@ def _parse_user(user_info: dict) -> dict:
     user |= interactions
 
     tags_lst = user_info.pop('tags')
-    tags = {t['tagType']: t.get('name') for t in tags_lst}
-    tags['age'] = tags.pop('info')
-    assert len(tags) == len(tags_lst)
+    tags_lst = [(t['tagType'], t.get('name')) for t in tags_lst]
+    tags = {t: n for t, n in tags_lst if t != 'profession'}
+    if 'info' in tags:
+        tags['age'] = tags.pop('info')
+    profession = [n for t, n in tags_lst if t == 'profession']
+    assert len(tags_lst) == len(tags) + len(profession)
+    tags['profession'] = profession
+
     assert user | tags == tags | user
     user |= tags
 
@@ -72,13 +77,16 @@ def _parse_user(user_info: dict) -> dict:
     assert 'followed' not in user
     if (fstatus := user.pop('fstatus')) == 'follows':
         user['followed'] = True
-        assert user.pop('tabPublic') == {'collection': False}
     else:
         assert fstatus == 'none'
         user['followed'] = False
-        assert user.pop('tabPublic') == {'collection': True}
 
-    user = {k: v for k, v in user.items() if v is not None}
+    tab_public = user.pop('tabPublic')
+    collection_public = tab_public.pop('collection')
+    assert not tab_public
+    user['collection_public'] = collection_public
+
+    user = {k: v for k, v in user.items() if v not in [None, [], '']}
 
     keys = ['id', 'red_id', 'nickname', 'age', 'description', 'homepage',
             'followed', 'location', 'ip_location', 'college']
@@ -155,7 +163,10 @@ def _parse_note(note: dict) -> dict:
     for k in ['time', 'last_update_time']:
         note[k] = pendulum.from_timestamp(note[k]/1000, tz='local')
 
-    tag_list = note.pop('tag_list')
+    tag_list = []
+    for t in note.pop('tag_list'):
+        if t not in tag_list:
+            tag_list.append(t)
     tags = {t['name']: t['type'] for t in tag_list}
     assert len(tags) == len(tag_list)
     assert set(tags.values()) == {'topic'} or not tags
@@ -163,7 +174,10 @@ def _parse_note(note: dict) -> dict:
     note['topics'] = list(tags.keys())
 
     assert 'at_user' not in note
-    note['at_user'] = note.pop('at_user_list')
+    at_user_list = note.pop('at_user_list')
+    at_user = {user['nickname']: user['user_id'] for user in at_user_list}
+    assert len(at_user) == len(at_user_list)
+    note['at_user'] = at_user
 
     image_list = note.pop('image_list')
     pics = []
@@ -179,10 +193,10 @@ def _parse_note(note: dict) -> dict:
     note['pic_ids'] = [pic.split('/')[-1] for pic in pics]
 
     if 'video' in note:
-        media = note.pop('video').pop('media')
-        video = media.pop('video')
-        note['video_md5'] = video['md5']
-        stream = {k: v for k, v in media.pop('stream').items() if v}
+        stream = note.pop('video').pop('media').pop('stream')
+        # video = media.pop('video')
+        # note['video_md5'] = video['md5']
+        stream = {k: v for k, v in stream.items() if v}
         h264 = stream.pop('h264')
         assert not stream
         assert len(h264) == 1
@@ -192,7 +206,7 @@ def _parse_note(note: dict) -> dict:
     for k in note:
         if isinstance(note[k], str):
             note[k] = note[k].strip()
-    note = {k: v for k, v in note.items() if v not in [None, [], '']}
+    note = {k: v for k, v in note.items() if v not in [None, [], '', {}]}
 
     keys = ['id', 'user_id', 'nickname',   'followed', 'title',
             'desc', 'time', 'last_update_time',
