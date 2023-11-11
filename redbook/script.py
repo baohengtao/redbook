@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pendulum
 from rich.prompt import Confirm, Prompt
-from typer import Typer
+from typer import Option, Typer
 
 from redbook import console
 from redbook.helper import default_path, logsaver, normalize_user_id
@@ -17,7 +17,9 @@ app = Typer()
 @app.command(help="Loop through users in database and fetch weibos")
 @logsaver
 def user_loop(download_dir: Path = default_path,
-              frequency: float = 3
+              frequency: float = 3,
+              update_note: bool = Option(
+                  False, "--update-note", "-u", help="Update note of user")
               ):
     fetching_time = pendulum.now()
     while True:
@@ -47,7 +49,7 @@ def user_loop(download_dir: Path = default_path,
                          UserConfig.id.asc()
         )):
             config = UserConfig.from_id(user_id=user.user_id)
-            config.fetch_note(download_dir)
+            config.fetch_note(download_dir, update_note=update_note)
             if time.time() > start_time + 600:
                 break
         fetching_time = pendulum.now().add(hours=frequency)

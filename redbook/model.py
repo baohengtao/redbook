@@ -135,7 +135,7 @@ class UserConfig(BaseModel):
             note['id'] = note.pop('note_id')
             yield note
 
-    def fetch_note(self, download_dir: Path):
+    def fetch_note(self, download_dir: Path, update_note: bool = True):
         if not self.note_fetch:
             return
         if self.note_fetch_at:
@@ -148,7 +148,8 @@ class UserConfig(BaseModel):
         console.log(f"Media Saving: {download_dir}")
 
         now = pendulum.now()
-        imgs = self._save_notes(since, download_dir)
+        imgs = self._save_notes(
+            since, download_dir, update_note=update_note)
         download_files(imgs)
         console.log(f"{self.username} 📒 获取完毕\n")
 
@@ -159,7 +160,9 @@ class UserConfig(BaseModel):
     def _save_notes(
             self,
             since: pendulum.DateTime,
-            download_dir: Path) -> Iterator[dict]:
+            download_dir: Path,
+            update_note: bool = True,
+    ) -> Iterator[dict]:
         """
         Save weibo to database and return media info
         :return: generator of medias to downloads
@@ -191,13 +194,14 @@ class UserConfig(BaseModel):
                             "获取完毕")
                         break
 
-            note = Note.from_id(note_info['id'], update=True)
+            note = Note.from_id(note_info['id'], update=update_note)
             assert note.time > since
             if (t := note_info.pop('title')) not in [note.title, note.desc]:
                 console.log(f"note_info['display_title]{t} not in "
                             f"{[note.title, note.desc]}", style='warning')
             for k, v in note_info.items():
-                assert getattr(note, k) == v
+                if getattr(note, k) != v:
+                    assert not update_note and k == 'liked_count'
             if not sticky:
                 note_id_order.append(note.id)
                 note_time_order.append(note.time)
