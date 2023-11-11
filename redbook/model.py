@@ -17,7 +17,7 @@ from playhouse.shortcuts import model_to_dict
 
 from redbook import console
 from redbook.helper import download_files
-from redbook.page import get_note, get_user_info, get_user_notes
+from redbook.redbook import get_note, get_user_info, get_user_notes
 
 database = PostgresqlExtDatabase("redbook", host="localhost")
 
