@@ -142,8 +142,7 @@ class UserConfig(BaseModel):
             since = pendulum.instance(self.note_fetch_at)
         else:
             since = pendulum.from_timestamp(0)
-        msg = f"fetch_at:{since:%y-%m-%d} liked_fetch:"
-        console.rule(f"开始获取 {self.username} 的主页 ({msg})")
+        console.rule(f"开始获取 {self.username} 的主页 (fetch_at:{since:%y-%m-%d})")
         console.log(self.user)
         console.log(f"Media Saving: {download_dir}")
 

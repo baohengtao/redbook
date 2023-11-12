@@ -20,31 +20,31 @@ app = Typer()
 
 @app.command(help="Loop through users in database and fetch weibos")
 @logsaver
-def user_loop(frequency: float = 24,
+def user_loop(frequency: float = 2,
               download_dir: Path = default_path,
               update_note: bool = Option(
                   False, "--update-note", "-u", help="Update note of user")
               ):
-    WORKING_TIME = 60
-    save_log_at = time.time() - 3600*24
+    query = (UserConfig.select()
+             .order_by(UserConfig.note_fetch_at.asc(nulls='first'),
+                       UserConfig.id.asc()))
+    WORKING_TIME = 600
+    save_log_at = time.time()
     while True:
         print_command()
         update_user_config()
         start_time = time.time()
-        for user in (UserConfig.select()
-                     .where(UserConfig.note_fetch)
-                     .order_by(
-                         UserConfig.note_fetch_at.asc(nulls='first'),
-                         UserConfig.id.asc()
-        )):
+        for user in query.where(UserConfig.note_fetch)[:3]:
             config = UserConfig.from_id(user_id=user.user_id)
             config.fetch_note(download_dir, update_note=update_note)
+            console.log('waiting for 60 seconds to fetching next user')
+            time.sleep(60)
             if (work_time := (time.time() - start_time)) > WORKING_TIME:
                 console.log(
                     f'have been working for {work_time:.0f} seconds,'
                     f'which is more than {WORKING_TIME}, taking a break')
                 break
-        if time.time() - save_log_at > 3600*5:
+        if time.time() - save_log_at > 3600*24:
             save_log('user_loop', download_dir)
             save_log_at = time.time()
 

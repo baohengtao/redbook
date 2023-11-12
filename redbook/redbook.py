@@ -174,10 +174,11 @@ def _parse_note(note: dict) -> dict:
     tags = {t['name']: t['type'] for t in tag_list}
     assert len(tags) == len(tag_list)
     assert set(tags.values()).issubset(
-        {'topic', 'buyable_goods', 'brand_page',
+        {'topic', 'topic_page', 'location_page',
+         'buyable_goods', 'brand_page', 'brand',
          'interact_pk', 'interact_vote', 'moment'})
     assert 'topics' not in note
-    note['topics'] = [k for k, v in tags.items() if v == 'topic']
+    note['topics'] = [k for k, v in tags.items() if 'topic' in v]
 
     assert 'at_user' not in note
     at_user_list = []

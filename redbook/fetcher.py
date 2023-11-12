@@ -110,8 +110,15 @@ class Fetcher:
         self._last_fetch += sleep_time
         if (wait_time := (self._last_fetch-time.time())) > 0:
             console.log(
-                f'sleep {wait_time:.1f} seconds...(count: {self._visit_count})',
+                f'sleep {wait_time:.1f} seconds...'
+                f'(count: {self._visit_count})',
                 style='info')
+        elif wait_time < -3600:
+            self._visit_count = 0
+            console.log(
+                f'reset visit count to {self._visit_count} since have '
+                f'no activity for {wait_time} seconds, '
+                'which means  more than 1 hour passed')
         else:
             console.log(
                 f'no sleeping since more than {sleep_time:.1f} seconds passed'
