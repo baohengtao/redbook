@@ -17,7 +17,7 @@ from playhouse.shortcuts import model_to_dict
 
 from redbook import console
 from redbook.helper import download_files
-from redbook.redbook import get_note, get_user_info, get_user_notes
+from redbook.redbook import get_note, get_user, get_user_notes
 
 database = PostgresqlExtDatabase("redbook", host="localhost")
 
@@ -67,7 +67,7 @@ class User(BaseModel):
     @classmethod
     def from_id(cls, user_id: str, update=False) -> Self:
         if update or not cls.get_or_none(id=user_id):
-            user_dict = get_user_info(user_id)
+            user_dict = get_user(user_id)
             cls.upsert(user_dict)
         return cls.get_by_id(user_id)
 

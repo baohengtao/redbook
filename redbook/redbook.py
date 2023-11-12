@@ -1,5 +1,6 @@
 import itertools
 import re
+import time
 from typing import Iterator
 
 import pendulum
@@ -9,24 +10,30 @@ from redbook.fetcher import fetcher
 from redbook.helper import convert_js_dict_to_py
 
 
-def get_user_info(user_id: str, parse=True) -> dict:
-    url = f"https://www.xiaohongshu.com/user/profile/{user_id}"
-    r = fetcher.get(url)
-    info = re.findall(
-        r'<script>window.__INITIAL_STATE__=(.*?)</script>', r.text)[0]
-    info = convert_js_dict_to_py(info)
-    user_info = info['user']['userPageData']
+def get_user(user_id: str, parse: bool = True) -> dict:
+    while True:
+        url = f"https://www.xiaohongshu.com/user/profile/{user_id}"
+        r = fetcher.get(url)
+        info = re.findall(
+            r'<script>window.__INITIAL_STATE__=(.*?)</script>', r.text)[0]
+        info = convert_js_dict_to_py(info)
+        user_info = info['user']['userPageData']
 
-    assert user_info.pop('result') == {
-        'success': True, 'code': 0, 'message': 'success'}
+        assert user_info.pop('result') == {
+            'success': True, 'code': 0, 'message': 'success'}
 
-    assert 'id' not in user_info
-    user_info['id'] = user_id
+        assert 'id' not in user_info
+        user_info['id'] = user_id
 
-    assert 'homepage' not in user_info
-    user_info['homepage'] = url
-
-    return _parse_user(user_info) if parse else user_info
+        assert 'homepage' not in user_info
+        user_info['homepage'] = url
+        try:
+            return _parse_user(user_info) if parse else user_info
+        except ValueError as e:
+            assert parse
+            console.log(e, style='error')
+            console.log('parsing failed, retrying after 60 seconds')
+            time.sleep(60)
 
 
 def _parse_user(user_info: dict) -> dict:
