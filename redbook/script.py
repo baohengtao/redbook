@@ -49,7 +49,7 @@ def user_loop(frequency: float = 2,
             save_log_at = time.time()
 
         fetching_time = pendulum.now().add(hours=frequency)
-        console.log(f'waiting for next fetching at {fetching_time:%H:%M:%S}')
+        console.rule(f'waiting for next fetching at {fetching_time:%H:%M:%S}')
         console.log(
             "Press S to fetching immediately,\n"
             "L to save log,\n"

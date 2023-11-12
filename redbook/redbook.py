@@ -135,8 +135,8 @@ def get_user_notes(user_id: str) -> Iterator[dict]:
 
 
 def get_note(note_id, parse=True):
-    note_data = (f'{{"source_note_id":"{note_id}",'
-                 '"image_scenes":["CRD_PRV_WEBP","CRD_WM_WEBP"]}')
+    note_data = {'source_note_id': note_id,
+                 'image_scenes': ['CRD_PRV_WEBP', 'CRD_WM_WEBP']}
     r = fetcher.post('https://edith.xiaohongshu.com',
                      '/api/sns/web/v1/feed', note_data)
     js = r.json()
@@ -180,10 +180,12 @@ def _parse_note(note: dict) -> dict:
             tag_list.append(t)
     tags = {t['name']: t['type'] for t in tag_list}
     assert len(tags) == len(tag_list)
-    assert set(tags.values()).issubset(
-        {'topic', 'topic_page', 'location_page',
-         'buyable_goods', 'brand_page', 'brand',
-         'interact_pk', 'interact_vote', 'moment'})
+    tag_types = {'topic', 'topic_page', 'location_page',
+                 'buyable_goods', 'brand_page', 'brand',
+                 'interact_pk', 'interact_vote', 'moment'}
+    if extra_types := (set(tags.values()) - tag_types):
+        console.log(
+            f'{note["url"]} find extra tag types {extra_types}', style='error')
     assert 'topics' not in note
     note['topics'] = [k for k, v in tags.items() if 'topic' in v]
 

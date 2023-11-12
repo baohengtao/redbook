@@ -127,8 +127,6 @@ class UserConfig(BaseModel):
             assert note.pop('nickname') == self.user.nickname
             assert note.pop('user_id') == self.user_id
 
-            assert 'title' not in note
-            note['title'] = note.pop('display_title').strip()
             note['liked_count'] = int(note['liked_count'])
 
             assert 'id' not in note
@@ -195,9 +193,11 @@ class UserConfig(BaseModel):
 
             note = Note.from_id(note_info['id'], update=update_note)
             assert note.time > since
-            if (t := note_info.pop('title')) not in [note.title, note.desc]:
-                console.log(f"note_info['display_title]{t} not in "
-                            f"{[note.title, note.desc]}", style='warning')
+            display_title = note.title or (note.desc or '').split('\n')[0]
+            if (t := note_info.pop('display_title')) != display_title:
+                if t.strip().replace(' ', '') != display_title.strip().replace(' ', ''):
+                    raise ValueError(f"note_info['display_title] {t} not in "
+                                     f"{[note.title, note.desc]}")
             for k, v in note_info.items():
                 if getattr(note, k) != v:
                     assert not update_note and k == 'liked_count'

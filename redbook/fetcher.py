@@ -1,4 +1,5 @@
 import http.cookies
+import json
 import os
 import random
 import time
@@ -65,8 +66,9 @@ class Fetcher:
                 assert r.status_code != 503
                 return r
 
-    def post(self, url, api, data):
+    def post(self, url, api, data: dict):
         self._pause()
+        data = json.dumps(data, separators=(',', ':'))
         headers = self.sess.headers | self._get_xs(api, data)
         url += api
         while True:
