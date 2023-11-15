@@ -181,7 +181,7 @@ def _parse_note(note: dict) -> dict:
     tags = {t['name']: t['type'] for t in tag_list}
     assert len(tags) == len(tag_list)
     tag_types = {'topic', 'topic_page', 'location_page',
-                 'buyable_goods', 'brand_page', 'brand',
+                 'buyable_goods', 'goods', 'brand_page', 'brand',
                  'interact_pk', 'interact_vote', 'moment'}
     if extra_types := (set(tags.values()) - tag_types):
         console.log(
@@ -240,3 +240,4 @@ def _parse_note(note: dict) -> dict:
     note_sorted = note1 | note2
     assert note_sorted == note
     return note_sorted
+

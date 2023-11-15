@@ -118,7 +118,7 @@ def write_xmp(img: Path, tags: dict):
         et.set_tags(img, tags, params=params)
 
 
-def logsaver(func):
+def logsaver_decorator(func):
     from functools import wraps
     from inspect import signature
 

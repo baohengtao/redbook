@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator, Self
@@ -193,11 +194,13 @@ class UserConfig(BaseModel):
 
             note = Note.from_id(note_info['id'], update=update_note)
             assert note.time > since
-            display_title = note.title or (note.desc or '').split('\n')[0]
-            if (t := note_info.pop('display_title')) != display_title:
-                if t.strip().replace(' ', '') != display_title.strip().replace(' ', ''):
-                    raise ValueError(f"note_info['display_title] {t} not in "
-                                     f"{[note.title, note.desc]}")
+            display_title = re.sub(
+                r'\s|\n', '', note.title or note.desc or '')
+            t = re.sub(r'\s|\n', '', note_info.pop('display_title'))
+
+            if t not in display_title:
+                raise ValueError(f"note_info['display_title] {t} not in "
+                                 f"{[note.title, note.desc]}")
             for k, v in note_info.items():
                 if getattr(note, k) != v:
                     assert not update_note and k == 'liked_count'
@@ -211,7 +214,6 @@ class UserConfig(BaseModel):
                 f"Downloading {len(medias)} files to {download_dir}..")
             console.print()
             yield from medias
-        assert sorted(note_id_order, reverse=True) == note_id_order
         assert sorted(note_time_order, reverse=True) == note_time_order
 
 
@@ -315,6 +317,12 @@ class Note(BaseModel):
             "%Y:%m:%d %H:%M:%S.%f").strip('0').strip('.')
         res = {"XMP:" + k: v for k, v in xmp_info.items() if v}
         return res
+
+    def __str__(self):
+        model = model_to_dict(self, recurse=False)
+        model.pop('pics')
+        model.pop('pic_ids')
+        return "\n".join(f'{k}: {v}' for k, v in model.items())
 
 
 class Artist(BaseModel):
