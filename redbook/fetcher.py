@@ -43,6 +43,7 @@ class Fetcher:
     def __init__(self) -> None:
         self.sess = _get_session()
         self._visit_count = 0
+        self.visits = 0
         self._last_fetch = time.time()
 
     def get(self, url, api='') -> requests.Response:
@@ -93,6 +94,7 @@ class Fetcher:
         return {k.lower(): str(v) for k, v in ret.items()}
 
     def _pause(self):
+        self.visits += 1
         if self._visit_count == 0:
             self._visit_count = 1
             self._last_fetch = time.time()
@@ -119,7 +121,7 @@ class Fetcher:
             self._visit_count = 0
             console.log(
                 f'reset visit count to {self._visit_count} since have '
-                f'no activity for {wait_time} seconds, '
+                f'no activity for {wait_time:.1f} seconds, '
                 'which means  more than 1 hour passed')
         else:
             console.log(
