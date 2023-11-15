@@ -135,6 +135,7 @@ def get_user_notes(user_id: str) -> Iterator[dict]:
 
 
 def get_note(note_id, parse=True):
+    note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
     note_data = {'source_note_id': note_id,
                  'image_scenes': ['CRD_PRV_WEBP', 'CRD_WM_WEBP']}
     r = fetcher.post('https://edith.xiaohongshu.com',
@@ -180,14 +181,16 @@ def _parse_note(note: dict) -> dict:
             tag_list.append(t)
     tags = {t['name']: t['type'] for t in tag_list}
     assert len(tags) == len(tag_list)
-    tag_types = {'topic', 'topic_page', 'location_page',
+    tag_types = {'topic', 'topic_page', 'location_page', 'vendor',
                  'buyable_goods', 'goods', 'brand_page', 'brand',
-                 'interact_pk', 'interact_vote', 'moment'}
+                 'interact_pk', 'interact_vote', 'moment', 'custom'}
     if extra_types := (set(tags.values()) - tag_types):
+        extra = {k: v for k, v in tags.items() if v in extra_types}
         console.log(
-            f'{note["url"]} find extra tag types {extra_types}', style='error')
+            f'{note["url"]} find extra tag types {extra}', style='error')
     assert 'topics' not in note
-    note['topics'] = [k for k, v in tags.items() if 'topic' in v]
+    note['topics'] = [k for k, v in tags.items() if v in (
+        'topic', 'topic_page', 'custom')]
 
     assert 'at_user' not in note
     at_user_list = []

@@ -243,6 +243,7 @@ class Note(BaseModel):
 
     @classmethod
     def from_id(cls, note_id, update=False) -> Self:
+        note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
         if update or not cls.get_or_none(id=note_id):
             note_dict = get_note(note_id)
             note_dict = {k: v for k, v in note_dict.items() if v != []}
