@@ -1,3 +1,4 @@
+import re
 import select
 import sys
 import time
@@ -15,7 +16,7 @@ from redbook.helper import (
     normalize_user_id,
     print_command, save_log
 )
-from redbook.model import UserConfig
+from redbook.model import Query, UserConfig
 
 app = Typer()
 
@@ -57,6 +58,8 @@ def user_loop(frequency: float = 2,
                   False, "--update-note", "-u", help="Update note of user")
               ):
     query = (UserConfig.select()
+             .where(UserConfig.note_fetch_at <
+                    pendulum.now().subtract(hours=12))
              .order_by(UserConfig.note_fetch_at.asc(nulls='first'),
                        UserConfig.id.asc()))
     WORKING_TIME = 10
@@ -74,6 +77,16 @@ def user_loop(frequency: float = 2,
                     f'have been working for {work_time}m '
                     f'which is more than {WORKING_TIME}m, taking a break')
                 break
+            console.log('waiting for 60 seconds to fetching next user')
+            time.sleep(60)
+
+        for query in get_user_search_query():
+            if (work_time := start_time.diff().in_minutes()) > WORKING_TIME:
+                console.log(
+                    f'have been working for {work_time}m '
+                    f'which is more than {WORKING_TIME}m, taking a break')
+                break
+            Query.search(query)
             console.log('waiting for 60 seconds to fetching next user')
             time.sleep(60)
 
@@ -145,3 +158,21 @@ def update_user_config():
             uc.photos_num = artist.photos_num
             uc.folder = artist.folder
             uc.save()
+
+
+def get_user_search_query():
+
+    from sinaspider.model import UserConfig as SinaConfig
+    sina_users = (SinaConfig.select()
+                  .where(SinaConfig.weibo_fetch)
+                  .where(SinaConfig.weibo_fetch_at.is_null(False))
+                  .where(SinaConfig.photos_num > 0)
+                  .order_by(SinaConfig.id.desc())
+                  )
+    for u in sina_users:
+        query = u.screen_name
+        if re.search(r'[\u4e00-\u9fff]', query):
+            continue
+        if Query.get_or_none(query=query):
+            continue
+        yield query

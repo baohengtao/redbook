@@ -244,3 +244,71 @@ def _parse_note(note: dict) -> dict:
     assert note_sorted == note
     return note_sorted
 
+
+def search_user(query: str) -> Iterator[dict]:
+    end_js = {
+        'msg': '方案执行结果为NULL',
+        'data': {'has_more': False,
+                 'result': {'code': 3002,
+                            'message': '方案执行结果为NULL',
+                            'success': True},
+                 'users': []},
+        'code': 3002,
+        'success': True}
+    post_data = {
+        "search_user_request": {
+            "page_size": 15,
+            "biz_type": "web_search_user",
+            "request_id": "1670737538-1700066036681",
+            "search_id": "2cggv3l10n0gzxfuj5rl7",
+            "keyword":  query
+        }
+    }
+    for page in itertools.count(start=1):
+        console.log(f'fetching page {page}')
+        post_data['search_user_request']['page'] = page
+        url = "https://edith.xiaohongshu.com"
+        api = '/api/sns/web/v1/search/usersearch'
+        js = fetcher.post(url, api, post_data).json()
+        if js == end_js:
+            return
+        data = js.pop('data')
+        assert js == {'code': 1000, 'success': True, 'msg': '成功'}
+        assert data.pop('result') == {'code': 1000,
+                                      'success': True, 'message': '成功'}
+        assert data.pop('has_more') in [False, True]
+        users = data.pop('users')
+        assert not data
+        for user in users:
+            assert 'nickname' not in user
+            user['nickname'] = user.pop('name')
+            assert 'avatar' not in user
+            user['avatar'] = user.pop('image').split('?')[0]
+            assert 'homepage' not in user
+            user['homepage'] = ('https://www.xiaohongshu.com'
+                                f'/user/profile/{user["id"]}')
+            assert 'query' not in user
+            user['query'] = query
+            assert 'query_url' not in user
+            user['query_url'] = ('https://www.xiaohongshu.com/'
+                                 f'search_result?keyword={query}')
+
+            try:
+                fans = user['fans']
+            except KeyError:
+                user['fans'] = 0
+            else:
+                if fans.endswith('万'):
+                    fans = float(fans.removesuffix('万')) * 10000
+                user['fans'] = int(fans)
+                assert user['fans'] > 0
+
+            assert user['red_id'] == user.pop(
+                'sub_title').removeprefix('小红书号：')
+            assert user['id'] == user.pop(
+                'link').removeprefix('xhsdiscover://1/user/user.')
+
+            assert 'user_id' not in user
+            user['user_id'] = user.pop('id')
+
+            yield user
