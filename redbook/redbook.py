@@ -271,6 +271,23 @@ def search_user(query: str) -> Iterator[dict]:
         api = '/api/sns/web/v1/search/usersearch'
         js = fetcher.post(url, api, post_data).json()
         if js == end_js:
+            if page == 1:
+                yield {'red_id': 'failed',
+                       'red_official_verified': False,
+                       'is_self': False,
+                       'vshow': 0,
+                       'followed': False,
+                       'red_official_verify_type': 0,
+                       'show_red_official_verify_icon': False,
+                       'fans': 0,
+                       'note_count': 0,
+                       'nickname': query,
+                       'avatar': 'failed',
+                       'homepage': 'failed',
+                       'query': query,
+                       'query_url': f'https://www.xiaohongshu.com/search_result?keyword={query}',
+                       'user_id': 'failed'}
+
             return
         data = js.pop('data')
         assert js == {'code': 1000, 'success': True, 'msg': '成功'}
