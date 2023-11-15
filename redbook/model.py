@@ -384,6 +384,7 @@ class Artist(BaseModel):
 class Query(BaseModel):
     user_id = TextField()
     red_id = CharField()
+    remark = CharField()
     query = CharField()
     nickname = CharField()
     fans = IntegerField()
@@ -405,14 +406,16 @@ class Query(BaseModel):
         )
 
     @classmethod
-    def search(cls, query: str):
+    def search(cls, query: str, remark: str):
         if not cls.get_or_none(query=query):
             console.log(f'searching {query}..')
             users = list(search_user(query))
             assert users
+            for u in users:
+                u['remark'] = remark
             cls.insert_many(users).execute()
         else:
-            console.log(f'query {query} has been searched, skip')
+            cls.update(remark=remark).where(cls.query == query).execute()
         return cls.select().where(cls.query == query)
 
 

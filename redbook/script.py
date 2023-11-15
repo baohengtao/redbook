@@ -80,13 +80,13 @@ def user_loop(frequency: float = 2,
             console.log('waiting for 60 seconds to fetching next user')
             time.sleep(60)
 
-        for query in get_user_search_query():
+        for query, remark in get_user_search_query():
             if (work_time := start_time.diff().in_minutes()) > WORKING_TIME:
                 console.log(
                     f'have been working for {work_time}m '
                     f'which is more than {WORKING_TIME}m, taking a break')
                 break
-            Query.search(query)
+            Query.search(query, remark)
             console.log('waiting for 60 seconds to fetching next user')
             time.sleep(60)
 
@@ -171,8 +171,9 @@ def get_user_search_query():
                   )
     for u in sina_users:
         query = u.screen_name
+        remark = u.username
         if re.search(r'[\u4e00-\u9fff]', query):
             continue
         if Query.get_or_none(query=query):
             continue
-        yield query
+        yield query, remark
