@@ -264,7 +264,7 @@ def search_user(query: str) -> Iterator[dict]:
             "keyword":  query
         }
     }
-    for page in itertools.count(start=1):
+    for page in range(1, 5):
         console.log(f'fetching page {page}')
         post_data['search_user_request']['page'] = page
         url = "https://edith.xiaohongshu.com"
@@ -288,7 +288,7 @@ def search_user(query: str) -> Iterator[dict]:
                        'query_url': f'https://www.xiaohongshu.com/search_result?keyword={query}',
                        'user_id': 'failed'}
 
-            return
+            break
         data = js.pop('data')
         assert js == {'code': 1000, 'success': True, 'msg': '成功'}
         assert data.pop('result') == {'code': 1000,
@@ -329,3 +329,8 @@ def search_user(query: str) -> Iterator[dict]:
             user['user_id'] = user.pop('id')
 
             yield user
+
+    else:
+        console.log(
+            f'too many result, only fetched first 4 pages for {query}',
+            style='warning')

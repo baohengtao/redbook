@@ -55,7 +55,7 @@ class User(BaseModel):
     homepage = TextField()
     followed = BooleanField()
     location = CharField(null=True)
-    ip_location = CharField()
+    ip_location = CharField(null=True)
     college = TextField(null=True)
     gender = IntegerField()
     follows = IntegerField()
@@ -64,6 +64,7 @@ class User(BaseModel):
     profession = ArrayField(field_class=TextField, null=True)
     collection_public = BooleanField()
     avatar = TextField()
+    added_at = DateTimeTZField(null=True, default=pendulum.now)
 
     @classmethod
     def from_id(cls, user_id: str, update=False) -> Self:
@@ -102,11 +103,12 @@ class UserConfig(BaseModel):
     homepage = TextField()
     followed = BooleanField()
     location = CharField(null=True)
-    ip_location = CharField()
+    ip_location = CharField(null=True)
     college = TextField(null=True)
     post_at = DateTimeTZField(null=True)
     photos_num = IntegerField(null=True)
     folder = CharField(null=True)
+    added_at = DateTimeTZField(null=True, default=pendulum.now)
 
     @classmethod
     def from_id(cls, user_id: int) -> Self:
@@ -196,9 +198,10 @@ class UserConfig(BaseModel):
             assert note.time > since
             display_title = re.sub(
                 r'\s|\n', '', note.title or note.desc or '')
+            display_topic = ''.join(note.topics or [])
             t = re.sub(r'\s|\n', '', note_info.pop('display_title'))
 
-            if t not in display_title:
+            if t not in display_topic + display_title + display_topic:
                 raise ValueError(f"note_info['display_title] {t} not in "
                                  f"{[note.title, note.desc]}")
             for k, v in note_info.items():
@@ -407,6 +410,10 @@ class Query(BaseModel):
 
     @classmethod
     def search(cls, query: str, remark: str):
+        db_query = (cls.select().where(cls.query == query)
+                    .where(cls.note_count > 0)
+                    .where(cls.fans > 100)
+                    )
         if not cls.get_or_none(query=query):
             console.log(f'searching {query}..')
             users = list(search_user(query))
@@ -414,6 +421,8 @@ class Query(BaseModel):
             for u in users:
                 u['remark'] = remark
             cls.insert_many(users).execute()
+            for u in db_query.order_by(cls.fans.desc())[:5]:
+                console.log(u, '\n')
         else:
             cls.update(remark=remark).where(cls.query == query).execute()
         return cls.select().where(cls.query == query)

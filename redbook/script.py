@@ -57,38 +57,41 @@ def user_loop(frequency: float = 2,
               update_note: bool = Option(
                   False, "--update-note", "-u", help="Update note of user")
               ):
-    query = (UserConfig.select()
-             .where(UserConfig.note_fetch_at <
-                    pendulum.now().subtract(hours=12))
-             .order_by(UserConfig.note_fetch_at.asc(nulls='first'),
-                       UserConfig.id.asc()))
-    WORKING_TIME = 10
+
+    WORKING_TIME = 20
     logsaver = LogSaver('user_loop', download_dir)
     while True:
         print_command()
         update_user_config()
+
         start_time = pendulum.now()
         start_count = fetcher.visits
-        for user in query.where(UserConfig.note_fetch)[:2]:
-            config = UserConfig.from_id(user_id=user.user_id)
-            config.fetch_note(download_dir, update_note=update_note)
-            if (work_time := start_time.diff().in_minutes()) > WORKING_TIME:
-                console.log(
-                    f'have been working for {work_time}m '
-                    f'which is more than {WORKING_TIME}m, taking a break')
-                break
-            console.log('waiting for 60 seconds to fetching next user')
-            time.sleep(60)
 
-        for query, remark in get_user_search_query():
-            if (work_time := start_time.diff().in_minutes()) > WORKING_TIME:
-                console.log(
-                    f'have been working for {work_time}m '
-                    f'which is more than {WORKING_TIME}m, taking a break')
+        configs_new = (UserConfig.select()
+                       .where(UserConfig.note_fetch_at.is_null(True))
+                       .where(UserConfig.note_fetch)
+                       .order_by(UserConfig.id))
+        configs = (UserConfig.select()
+                   .where(UserConfig.note_fetch_at <
+                          pendulum.now().subtract(days=1))
+                   .where(UserConfig.note_fetch)
+                   .order_by(UserConfig.note_fetch_at))[:5]
+        for config in (configs_new or configs):
+            if start_time.diff().in_minutes() > WORKING_TIME:
                 break
-            Query.search(query, remark)
-            console.log('waiting for 60 seconds to fetching next user')
-            time.sleep(60)
+            config = UserConfig.from_id(user_id=config.user_id)
+            config.fetch_note(download_dir, update_note=update_note)
+
+        for search_query, remark in get_user_search_query():
+            if start_time.diff().in_minutes() > WORKING_TIME:
+                break
+            Query.search(search_query, remark)
+            console.log('waiting for 120 seconds to fetching next user')
+            time.sleep(120)
+
+        console.log(
+            f'have been working for {start_time.diff().in_minutes()}m '
+            f'which is more than {WORKING_TIME}m, taking a break')
 
         logsaver.save_log(fetcher.visits-start_count)
         next_start_time = pendulum.now().add(hours=frequency)
@@ -172,7 +175,7 @@ def get_user_search_query():
     for u in sina_users:
         query = u.screen_name
         remark = u.username
-        if re.search(r'[\u4e00-\u9fff]', query):
+        if re.search(r'[\u4e00-\u9fff·]', query):
             continue
         if Query.get_or_none(query=query):
             continue
