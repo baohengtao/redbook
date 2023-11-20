@@ -65,11 +65,15 @@ class User(BaseModel):
     collection_public = BooleanField()
     avatar = TextField()
     added_at = DateTimeTZField(null=True, default=pendulum.now)
+    redirect = TextField(null=True)
 
     @classmethod
     def from_id(cls, user_id: str, update=False) -> Self:
         if update or not cls.get_or_none(id=user_id):
-            user_dict = get_user(user_id)
+            for _ in range(3):
+                user_dict = get_user(user_id)
+                if user_dict['followed']:
+                    break
             cls.upsert(user_dict)
         return cls.get_by_id(user_id)
 
@@ -77,7 +81,8 @@ class User(BaseModel):
     def upsert(cls, user_dict: dict):
         user_id = user_dict['id']
         if not (model := cls.get_or_none(id=user_id)):
-            user_dict['username'] = user_dict['nickname']
+            user_dict['username'] = user_dict['nickname'].strip('-_ ')
+            assert user_dict['username']
             return cls.insert(user_dict).execute()
         model_dict = model_to_dict(model)
 
@@ -202,8 +207,8 @@ class UserConfig(BaseModel):
             t = re.sub(r'\s|\n', '', note_info.pop('display_title'))
 
             if t not in display_topic + display_title + display_topic:
-                raise ValueError(f"note_info['display_title] {t} not in "
-                                 f"{[note.title, note.desc]}")
+                console.log(f"note_info['display_title] {t} not in "
+                            f"{[note.title, note.desc]}", style='error')
             for k, v in note_info.items():
                 if getattr(note, k) != v:
                     assert not update_note and k == 'liked_count'
@@ -333,7 +338,7 @@ class Artist(BaseModel):
     user = ForeignKeyField(User, unique=True, backref='artist')
     red_id = CharField(unique=True)
     username = CharField(index=True)
-    age = IntegerField(null=True)
+    age = CharField(null=True)
     folder = CharField(null=True, default="recent")
     photos_num = IntegerField(default=0)
     favor_num = IntegerField(default=0)
@@ -342,7 +347,7 @@ class Artist(BaseModel):
     homepage = CharField(null=True)
     followed = BooleanField()
     location = CharField(null=True)
-    ip_location = CharField()
+    ip_location = CharField(null=True)
     college = TextField(null=True)
     gender = IntegerField()
     follows = IntegerField()
@@ -402,6 +407,7 @@ class Query(BaseModel):
     vshow = IntegerField()
     is_self = BooleanField()
     red_official_verified = BooleanField()
+    profession = TextField(null=True)
 
     class Meta:
         indexes = (
@@ -410,10 +416,6 @@ class Query(BaseModel):
 
     @classmethod
     def search(cls, query: str, remark: str):
-        db_query = (cls.select().where(cls.query == query)
-                    .where(cls.note_count > 0)
-                    .where(cls.fans > 100)
-                    )
         if not cls.get_or_none(query=query):
             console.log(f'searching {query}..')
             users = list(search_user(query))
@@ -421,8 +423,6 @@ class Query(BaseModel):
             for u in users:
                 u['remark'] = remark
             cls.insert_many(users).execute()
-            for u in db_query.order_by(cls.fans.desc())[:5]:
-                console.log(u, '\n')
         else:
             cls.update(remark=remark).where(cls.query == query).execute()
         return cls.select().where(cls.query == query)

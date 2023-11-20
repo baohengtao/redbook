@@ -50,7 +50,7 @@ class LogSaver:
         self.total_fetch_count = 0
 
 
-@app.command(help="Loop through users in database and fetch weibos")
+@app.command()
 @logsaver_decorator
 def user_loop(frequency: float = 2,
               download_dir: Path = default_path,
@@ -129,6 +129,10 @@ def user_loop(frequency: float = 2,
 def user(download_dir: Path = default_path):
     """Add user to database of users whom we want to fetch from"""
     update_user_config()
+    user = UserConfig.select().order_by(UserConfig.id.desc()).first()
+    console.log(f'total {UserConfig.select().count()} users in database')
+    console.log(f'the latest added user is {user.username}({user.user_id})')
+
     while user_id := Prompt.ask('请输入用户名:smile:').strip():
         if uc := UserConfig.get_or_none(username=user_id):
             user_id = uc.user_id
@@ -149,6 +153,16 @@ def user(download_dir: Path = default_path):
             console.log('用户已删除')
         elif uc.note_fetch and Confirm.ask('是否现在抓取', default=False):
             uc.fetch_note(download_dir)
+
+
+@app.command()
+def write_meta(download_dir: Path = default_path):
+    from imgmeta.script import rename, write_meta
+    for folder in ['User', 'New']:
+        ori = download_dir / folder
+        if ori.exists():
+            write_meta(ori)
+            rename(ori, new_dir=True, root=ori.parent / (ori.stem + 'Pro'))
 
 
 def update_user_config():
@@ -173,7 +187,7 @@ def get_user_search_query():
                   .order_by(SinaConfig.id.desc())
                   )
     for u in sina_users:
-        query = u.screen_name
+        query = u.nickname
         remark = u.username
         if re.search(r'[\u4e00-\u9fff·]', query):
             continue

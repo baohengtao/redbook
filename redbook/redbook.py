@@ -180,7 +180,8 @@ def _parse_note(note: dict) -> dict:
         if t not in tag_list:
             tag_list.append(t)
     tags = {t['name']: t['type'] for t in tag_list}
-    assert len(tags) == len(tag_list)
+    if len(tags) != len(tag_list):
+        console.log(f'{note["url"]} len(tags) != len(tag_list)', style='error')
     tag_types = {'topic', 'topic_page', 'location_page', 'vendor',
                  'buyable_goods', 'goods', 'brand_page', 'brand',
                  'interact_pk', 'interact_vote', 'moment', 'custom'}
@@ -265,7 +266,6 @@ def search_user(query: str) -> Iterator[dict]:
         }
     }
     for page in range(1, 5):
-        console.log(f'fetching page {page}')
         post_data['search_user_request']['page'] = page
         url = "https://edith.xiaohongshu.com"
         api = '/api/sns/web/v1/search/usersearch'
