@@ -193,6 +193,8 @@ class UserConfig(BaseModel):
                     if sticky:
                         console.log("略过置顶笔记...")
                         continue
+                    elif note.time > since.subtract(months=1):
+                        continue
                     else:
                         console.log(
                             f"时间 {note.time:%y-%m-%d} 在 {since:%y-%m-%d}之前, "
@@ -200,7 +202,10 @@ class UserConfig(BaseModel):
                         break
 
             note = Note.from_id(note_info['id'], update=update_note)
-            assert note.time > since
+            if note.time < since:
+                console.log(
+                    f'find note {note.id} before {since:%y-%m-%d} '
+                    'but not fetched!', style='error')
             display_title = re.sub(
                 r'\s|\n', '', note.title or note.desc or '')
             display_topic = ''.join(note.topics or [])
@@ -248,6 +253,8 @@ class Note(BaseModel):
     pic_ids = ArrayField(field_class=TextField)
     pics = ArrayField(field_class=TextField)
     video = TextField(null=True)
+    added_at = TextField(null=True)
+    updated_at = TextField(null=True)
 
     @classmethod
     def from_id(cls, note_id, update=False) -> Self:
@@ -266,8 +273,13 @@ class Note(BaseModel):
     @classmethod
     def upsert(cls, note_dict):
         note_id = note_dict['id']
+        assert 'added_at' not in note_dict
+        assert 'updated_at' not in note_dict
         if not (model := cls.get_or_none(id=note_id)):
+            note_dict['added_at'] = pendulum.now()
             return cls.insert(note_dict).execute()
+        else:
+            note_dict['updated_at'] = pendulum.now()
         model_dict = model_to_dict(model, recurse=False)
         model_dict['user_id'] = model_dict.pop('user')
 
