@@ -66,17 +66,13 @@ def user_loop(frequency: float = 2,
 
         start_time = pendulum.now()
         start_count = fetcher.visits
-
-        configs_new = (UserConfig.select()
-                       .where(UserConfig.note_fetch_at.is_null(True))
-                       .where(UserConfig.note_fetch)
-                       .order_by(UserConfig.id))
-        configs = (UserConfig.select()
-                   .where(UserConfig.note_fetch_at <
-                          pendulum.now().subtract(days=1))
-                   .where(UserConfig.note_fetch)
-                   .order_by(UserConfig.note_fetch_at))[:5]
-        for config in (configs_new or configs):
+        query = (UserConfig.select()
+                 .where(UserConfig.note_fetch)
+                 .order_by(UserConfig.note_fetch_at, UserConfig.id)
+                 )
+        configs_new = query.where(UserConfig.note_fetch_at.is_null(True))
+        configs = query.where(UserConfig.note_next_fetch < pendulum.now())[:5]
+        for config in (configs_new or configs or query[:2]):
             if start_time.diff().in_minutes() > WORKING_TIME:
                 break
             config = UserConfig.from_id(user_id=config.user_id)

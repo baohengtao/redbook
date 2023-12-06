@@ -82,7 +82,7 @@ def _parse_user(user_info: dict) -> dict:
         user[key] = int(user[key])
 
     assert 'followed' not in user
-    if (fstatus := user.pop('fstatus')) == 'follows':
+    if (fstatus := user.pop('fstatus')) in ['follows', 'both']:
         user['followed'] = True
     else:
         assert fstatus == 'none'
@@ -169,8 +169,13 @@ def _parse_note(note: dict) -> dict:
     assert note.pop('un_share') is False
     assert 'id' not in note
     note['id'] = note.pop('note_id')
-    relation = 'follows' if note['followed'] else 'none'
-    assert relation == note.pop('relation')
+    if (relation := note.pop('relation')) in ['follows', 'both']:
+        assert note['followed'] is True
+    else:
+        assert relation == 'none'
+        assert note['followed'] is False
+    # relation = 'follows' if note['followed'] else 'none'
+    # assert relation == note.pop('relation')
 
     for k in ['time', 'last_update_time']:
         note[k] = pendulum.from_timestamp(note[k]/1000, tz='local')
@@ -229,7 +234,7 @@ def _parse_note(note: dict) -> dict:
 
     for k in note:
         if isinstance(note[k], str):
-            note[k] = note[k].strip()
+            note[k] = note[k].replace('\x0b', ' ').strip()
     note = {k: v for k, v in note.items() if v not in [None, [], '', {}]}
 
     keys = ['id', 'user_id', 'nickname',   'followed', 'title',

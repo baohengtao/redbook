@@ -103,6 +103,7 @@ class UserConfig(BaseModel):
     username = CharField()
     note_fetch = BooleanField(default=True)
     note_fetch_at = DateTimeTZField(null=True)
+    note_next_fetch = DateTimeTZField(null=True)
     age = CharField(null=True)
     description = TextField(null=True)
     homepage = TextField()
@@ -141,6 +142,13 @@ class UserConfig(BaseModel):
             note['id'] = note.pop('note_id')
             yield note
 
+    def get_note_next_fetch(self) -> pendulum.DateTime:
+        interval = pendulum.Duration(days=30)
+        start, end = self.note_fetch_at-interval, self.note_fetch_at
+        count = self.user.notes.where(Note.time.between(start, end)).count()
+        cycle = interval / (count + 1)
+        return self.note_fetch_at + cycle / 2
+
     def fetch_note(self, download_dir: Path, update_note: bool = True):
         if not self.note_fetch:
             return
@@ -160,6 +168,7 @@ class UserConfig(BaseModel):
 
         self.note_fetch_at = now
         self.post_at = self.user.notes.order_by(Note.time.desc()).first().time
+        self.note_next_fetch = self.get_note_next_fetch()
         self.save()
 
     def _save_notes(
@@ -351,10 +360,7 @@ class Artist(BaseModel):
     red_id = CharField(unique=True)
     username = CharField(index=True)
     age = CharField(null=True)
-    folder = CharField(null=True, default="recent")
     photos_num = IntegerField(default=0)
-    favor_num = IntegerField(default=0)
-    recent_num = IntegerField(default=0)
     description = TextField(null=True)
     homepage = CharField(null=True)
     followed = BooleanField()
