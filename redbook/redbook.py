@@ -180,23 +180,18 @@ def _parse_note(note: dict) -> dict:
     for k in ['time', 'last_update_time']:
         note[k] = pendulum.from_timestamp(note[k]/1000, tz='local')
 
-    tag_list = []
-    for t in note.pop('tag_list'):
-        if t not in tag_list:
-            tag_list.append(t)
-    tags = {t['name']: t['type'] for t in tag_list}
-    if len(tags) != len(tag_list):
-        console.log(f'{note["url"]} len(tags) != len(tag_list)', style='error')
+    tags = {(tag['name'], tag['type']) for tag in note.pop('tag_list')}
     tag_types = {'topic', 'topic_page', 'location_page', 'vendor',
                  'buyable_goods', 'goods', 'brand_page', 'brand',
                  'interact_pk', 'interact_vote', 'moment', 'custom'}
-    if extra_types := (set(tags.values()) - tag_types):
-        extra = {k: v for k, v in tags.items() if v in extra_types}
+
+    if extra_types := ({t for _, t in tags} - tag_types):
+        extra = {(n, t) for n, t in tags if t in extra_types}
         console.log(
             f'{note["url"]} find extra tag types {extra}', style='error')
     assert 'topics' not in note
-    note['topics'] = [k for k, v in tags.items() if v in (
-        'topic', 'topic_page', 'custom')]
+    note['topics'] = sorted({n for n, t in tags if t in (
+        'topic', 'topic_page', 'custom', 'location_page')})
 
     assert 'at_user' not in note
     at_user_list = []
