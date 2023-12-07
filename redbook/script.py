@@ -26,28 +26,28 @@ class LogSaver:
         self.command = command
         self.download_dir = download_dir
         self.save_log_at = pendulum.now()
-        self.total_fetch_count = 0
+        self.save_visits_at = fetcher.visits
         self.SAVE_LOG_INTERVAL = 12  # hours
         self.SAVE_LOG_FOR_COUNT = 100
 
-    def save_log(self, fetch_count=0):
-        self.total_fetch_count += fetch_count
+    def save_log(self, save_manually=False):
+        fetch_count = fetcher.visits - self.save_visits_at
         log_hours = self.save_log_at.diff().in_hours()
         console.log(
-            f'total fetch count: {self.total_fetch_count}, '
+            f'total fetch count: {fetch_count}, '
             f'threshold: {self.SAVE_LOG_FOR_COUNT}')
         console.log(
             f'log hours: {log_hours}, threshold: {self.SAVE_LOG_INTERVAL}h')
         if (log_hours > self.SAVE_LOG_INTERVAL or
-                self.total_fetch_count > self.SAVE_LOG_FOR_COUNT):
+                fetch_count > self.SAVE_LOG_FOR_COUNT):
             console.log('Threshold reached, saving log automatically...')
-        elif fetch_count == 0:
+        elif save_manually:
             console.log('Saving log manually...')
         else:
             return
         save_log(self.command, self.download_dir)
         self.save_log_at = pendulum.now()
-        self.total_fetch_count = 0
+        self.save_visits_at = fetcher.visits
 
 
 @app.command()
@@ -65,7 +65,6 @@ def user_loop(frequency: float = 2,
         update_user_config()
 
         start_time = pendulum.now()
-        start_count = fetcher.visits
         query = (UserConfig.select()
                  .where(UserConfig.note_fetch)
                  .order_by(UserConfig.note_fetch_at, UserConfig.id)
@@ -89,7 +88,7 @@ def user_loop(frequency: float = 2,
             f'have been working for {start_time.diff().in_minutes()}m '
             f'which is more than {WORKING_TIME}m, taking a break')
 
-        logsaver.save_log(fetcher.visits-start_count)
+        logsaver.save_log()
         next_start_time = pendulum.now().add(hours=frequency)
         console.rule(f'waiting for next fetching at {next_start_time:%H:%M:%S}',
                      style='magenta on dark_magenta')
@@ -111,7 +110,7 @@ def user_loop(frequency: float = 2,
                         console.log("Q pressed. exiting.")
                         return
                     case "l":
-                        logsaver.save_log()
+                        logsaver.save_log(save_manually=True)
                     case _:
                         console.log(
                             "Press S to fetching immediately,\n"
@@ -165,12 +164,16 @@ def update_user_config():
     """
     Update photos num for user_config
     """
-    from redbook.model import Artist, UserConfig
+    from photosinfo.model import Girl
+
+    from redbook.model import UserConfig
     for uc in UserConfig:
-        if artist := Artist.get_or_none(user=uc.user):
-            uc.photos_num = artist.photos_num
-            uc.folder = artist.folder
-            uc.save()
+        if girl := Girl.get_or_none(red_id=uc.user_id):
+            uc.photos_num = girl.red_num
+            uc.folder = girl.folder
+        else:
+            uc.photos_num = 0
+        uc.save()
 
 
 def get_user_search_query():

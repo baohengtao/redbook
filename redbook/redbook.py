@@ -14,6 +14,7 @@ def get_user(user_id: str, parse: bool = True) -> dict:
     while True:
         url = f"https://www.xiaohongshu.com/user/profile/{user_id}"
         r = fetcher.get(url)
+        assert (c := r.status_code) != 503
         info = re.findall(
             r'<script>window.__INITIAL_STATE__=(.*?)</script>', r.text)[0]
         info = convert_js_dict_to_py(info)
@@ -161,6 +162,7 @@ def _parse_note(note: dict) -> dict:
         value = note.pop(key)
         assert note | value == value | note
         note |= value
+    note.pop('illegal_info', None)
 
     for k in note:
         if 'count' in k:
