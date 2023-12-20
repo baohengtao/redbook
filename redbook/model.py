@@ -62,6 +62,7 @@ class User(BaseModel):
     fans = IntegerField()
     interaction = IntegerField()
     profession = ArrayField(field_class=TextField, null=True)
+    verified = BooleanField()
     collection_public = BooleanField()
     avatar = TextField()
     added_at = DateTimeTZField(null=True, default=pendulum.now)

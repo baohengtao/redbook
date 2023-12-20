@@ -94,6 +94,13 @@ def _parse_user(user_info: dict) -> dict:
     assert not tab_public
     user['collection_public'] = collection_public
 
+    assert 'verified' not in user
+    if verifyInfo := user.pop('verifyInfo', None):
+        assert verifyInfo == {'redOfficialVerifyType': 1}
+        user['verified'] = True
+    else:
+        user['verified'] = False
+
     user = {k: v for k, v in user.items() if v not in [None, [], '']}
 
     keys = ['id', 'red_id', 'nickname', 'age', 'description', 'homepage',
