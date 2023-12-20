@@ -89,6 +89,8 @@ class User(BaseModel):
 
         for k, v in user_dict.items():
             assert v or v == 0
+            if k in ['fans', 'follows', 'interaction']:
+                continue
             if v == model_dict[k]:
                 continue
             console.log(f'+{k}: {v}', style='green bold on dark_green')
@@ -165,7 +167,7 @@ class UserConfig(BaseModel):
         imgs = self._save_notes(
             since, download_dir, update_note=update_note)
         download_files(imgs)
-        console.log(f"{self.username} 📒 获取完毕\n")
+        console.log(f"{self.username} 📕 获取完毕\n")
 
         self.note_fetch_at = now
         self.post_at = self.user.notes.order_by(Note.time.desc()).first().time
@@ -195,7 +197,7 @@ class UserConfig(BaseModel):
         download_dir = download_dir / user_root / self.username
 
         console.log(f'fetch notes from {since:%Y-%m-%d}\n')
-        note_id_order, note_time_order = [], []
+        note_time_order = []
         for note_info in self.page():
             sticky = note_info.pop('sticky')
             if note := Note.get_or_none(id=note_info['id']):
@@ -228,7 +230,6 @@ class UserConfig(BaseModel):
                 if getattr(note, k) != v:
                     assert not update_note and k == 'liked_count'
             if not sticky:
-                note_id_order.append(note.id)
                 note_time_order.append(note.time)
 
             medias = list(note.medias(download_dir))
@@ -237,7 +238,9 @@ class UserConfig(BaseModel):
                 f"Downloading {len(medias)} files to {download_dir}..")
             console.print()
             yield from medias
-        assert sorted(note_time_order, reverse=True) == note_time_order
+        if note_time_order:
+            console.log(f'{len(note_time_order)} notes fetched')
+            assert sorted(note_time_order, reverse=True) == note_time_order
 
 
 class Note(BaseModel):

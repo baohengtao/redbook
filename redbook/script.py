@@ -80,13 +80,18 @@ def user_loop(frequency: float = 2,
         else:
             configs = query[:2]
             console.log(
-                'no user need to be fetched, '
+                'no user satisfy fetching conditions, '
                 'fetching 2 users whose note_fetch_at is earliest.')
-        for config in configs:
+        for i, config in enumerate(configs):
             if start_time.diff().in_minutes() > WORKING_TIME:
                 break
+            console.log(f'fetching {i+1}/{len(configs)}: {config.username}')
             config = UserConfig.from_id(user_id=config.user_id)
+            is_new = config.note_fetch_at is None
             config.fetch_note(download_dir, update_note=update_note)
+            if is_new:
+                logsaver.save_log(save_manually=True)
+                print_command()
 
         for search_query, remark in get_user_search_query():
             if start_time.diff().in_minutes() > WORKING_TIME:
@@ -146,7 +151,7 @@ def user(download_dir: Path = default_path):
         if uc := UserConfig.get_or_none(user_id=user_id):
             console.log(f'用户{uc.username}已在列表中')
         uc = UserConfig.from_id(user_id)
-        console.log(uc, '\n')
+        console.log(uc)
         uc.note_fetch = Confirm.ask(f"是否获取{uc.username}的主页？", default=True)
         uc.save()
         console.log(f'用户{uc.username}更新完成')
@@ -159,6 +164,7 @@ def user(download_dir: Path = default_path):
             console.log('用户已删除')
         elif uc.note_fetch and Confirm.ask('是否现在抓取', default=False):
             uc.fetch_note(download_dir)
+        console.log()
 
 
 @app.command()
