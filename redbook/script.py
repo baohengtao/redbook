@@ -69,9 +69,20 @@ def user_loop(frequency: float = 2,
                  .where(UserConfig.note_fetch)
                  .order_by(UserConfig.note_fetch_at, UserConfig.id)
                  )
-        configs_new = query.where(UserConfig.note_fetch_at.is_null(True))
-        configs = query.where(UserConfig.note_next_fetch < pendulum.now())[:5]
-        for config in (configs_new or configs or query[:2]):
+        if configs := query.where(UserConfig.note_fetch_at.is_null(True)):
+            console.log(
+                f'total {configs.count()} new users found, fetching...')
+        elif configs := query.where(UserConfig.note_next_fetch < pendulum.now()):
+            console.log(
+                f' {len(configs)} users satisfy fetching conditions, '
+                'Fetching 5 users whose note_fetch_at is earliest.')
+            configs = configs[:5]
+        else:
+            configs = query[:2]
+            console.log(
+                'no user need to be fetched, '
+                'fetching 2 users whose note_fetch_at is earliest.')
+        for config in configs:
             if start_time.diff().in_minutes() > WORKING_TIME:
                 break
             config = UserConfig.from_id(user_id=config.user_id)
