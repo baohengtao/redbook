@@ -107,6 +107,7 @@ class UserConfig(BaseModel):
     note_fetch = BooleanField(default=True)
     note_fetch_at = DateTimeTZField(null=True)
     note_next_fetch = DateTimeTZField(null=True)
+    post_cycle = IntegerField(null=True)
     age = CharField(null=True)
     description = TextField(null=True)
     homepage = TextField()
@@ -145,12 +146,12 @@ class UserConfig(BaseModel):
             note['id'] = note.pop('note_id')
             yield note
 
-    def get_note_next_fetch(self) -> pendulum.DateTime:
+    def get_post_cycle(self) -> int:
         interval = pendulum.Duration(days=30)
         start, end = self.note_fetch_at-interval, self.note_fetch_at
         count = self.user.notes.where(Note.time.between(start, end)).count()
         cycle = interval / (count + 1)
-        return self.note_fetch_at + cycle / 2
+        return cycle.in_hours()
 
     @classmethod
     def update_table(cls):
@@ -161,6 +162,9 @@ class UserConfig(BaseModel):
                 config.folder = girl.folder
             else:
                 config.photos_num = 0
+            config.post_cycle = config.get_post_cycle()
+            config.note_next_fetch += pendulum.Duration(
+                hours=config.post_cycle/2)
             config.save()
 
     def fetch_note(self, download_dir: Path, update_note: bool = True):
@@ -170,7 +174,13 @@ class UserConfig(BaseModel):
             since = pendulum.instance(self.note_fetch_at)
         else:
             since = pendulum.from_timestamp(0)
-        console.rule(f"开始获取 {self.username} 的主页 (fetch_at:{since:%y-%m-%d})")
+        if self.note_fetch_at:
+            estimated_post = int(since.diff().in_hours() / self.post_cycle)
+            estimated_post = f'estimated_new_posts:{estimated_post}'
+            msg = f' (fetch_at:{since:%y-%m-%d} {estimated_post})'
+        else:
+            msg = ''
+        console.rule(f"开始获取 {self.username} 的主页 {msg}")
         console.log(self.user)
         console.log(f"Media Saving: {download_dir}")
 
@@ -182,7 +192,9 @@ class UserConfig(BaseModel):
 
         self.note_fetch_at = now
         self.post_at = self.user.notes.order_by(Note.time.desc()).first().time
-        self.note_next_fetch = self.get_note_next_fetch()
+        self.post_cycle = self.get_post_cycle()
+        self.note_next_fetch += pendulum.Duration(
+            hours=self.post_cycle/2)
         self.save()
 
     def _save_notes(

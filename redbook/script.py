@@ -63,11 +63,13 @@ def user_loop(frequency: float = 2,
     while True:
         print_command()
         UserConfig.update_table()
+        post_count = ((time.time()-UserConfig.note_fetch_at.to_timestamp())
+                      / UserConfig.post_cycle).desc()
 
         start_time = pendulum.now()
         query = (UserConfig.select()
                  .where(UserConfig.note_fetch)
-                 .order_by(UserConfig.note_fetch_at, UserConfig.id)
+                 .order_by(post_count, UserConfig.id)
                  )
         if configs := query.where(UserConfig.note_fetch_at.is_null(True)):
             console.log(
