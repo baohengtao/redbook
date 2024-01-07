@@ -62,7 +62,7 @@ def user_loop(frequency: float = 2,
     logsaver = LogSaver('user_loop', download_dir)
     while True:
         print_command()
-        update_user_config()
+        UserConfig.update_table()
 
         start_time = pendulum.now()
         query = (UserConfig.select()
@@ -139,7 +139,7 @@ def user_loop(frequency: float = 2,
 @logsaver_decorator
 def user(download_dir: Path = default_path):
     """Add user to database of users whom we want to fetch from"""
-    update_user_config()
+    UserConfig.update_table()
     user = UserConfig.select().order_by(UserConfig.id.desc()).first()
     console.log(f'total {UserConfig.select().count()} users in database')
     console.log(f'the latest added user is {user.username}({user.user_id})')
@@ -175,22 +175,6 @@ def write_meta(download_dir: Path = default_path):
         if ori.exists():
             write_meta(ori)
             rename(ori, new_dir=True, root=ori.parent / (ori.stem + 'Pro'))
-
-
-def update_user_config():
-    """
-    Update photos num for user_config
-    """
-    from photosinfo.model import Girl
-
-    from redbook.model import UserConfig
-    for uc in UserConfig:
-        if girl := Girl.get_or_none(red_id=uc.user_id):
-            uc.photos_num = girl.red_num
-            uc.folder = girl.folder
-        else:
-            uc.photos_num = 0
-        uc.save()
 
 
 def get_user_search_query():

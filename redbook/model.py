@@ -152,6 +152,17 @@ class UserConfig(BaseModel):
         cycle = interval / (count + 1)
         return self.note_fetch_at + cycle / 2
 
+    @classmethod
+    def update_table(cls):
+        from photosinfo.model import Girl
+        for config in UserConfig:
+            if girl := Girl.get_or_none(red_id=config.user_id):
+                config.photos_num = girl.red_num
+                config.folder = girl.folder
+            else:
+                config.photos_num = 0
+            config.save()
+
     def fetch_note(self, download_dir: Path, update_note: bool = True):
         if not self.note_fetch:
             return
