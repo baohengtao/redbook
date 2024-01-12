@@ -61,6 +61,8 @@ def download_single_file(
 ):
     filepath.mkdir(parents=True, exist_ok=True)
     img = filepath / filename
+    headers = {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188", }
     if img.exists():
         console.log(f'{img} already exists..skipping...', style='info')
         return
@@ -68,7 +70,7 @@ def download_single_file(
         console.log(f'downloading {img}...', style="dim")
     while True:
         try:
-            r = requests.get(url)
+            r = requests.get(url, headers=headers)
         except ConnectionError as e:
             period = 60
             console.log(

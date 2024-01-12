@@ -77,10 +77,10 @@ def user_loop(frequency: float = 2,
         elif configs := query.where(UserConfig.note_next_fetch < pendulum.now()):
             console.log(
                 f' {len(configs)} users satisfy fetching conditions, '
-                'Fetching 5 users whose note_fetch_at is earliest.')
+                'Fetching 5 users whose estimated new notes is most')
             configs = configs[:5]
         else:
-            configs = query[:2]
+            configs = query.order_by(UserConfig.note_fetch_at).limit(2)
             console.log(
                 'no user satisfy fetching conditions, '
                 'fetching 2 users whose note_fetch_at is earliest.')

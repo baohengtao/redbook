@@ -57,7 +57,8 @@ class Fetcher:
                 r = self.sess.get(url, headers=headers)
                 r.raise_for_status()
             except (requests.exceptions.ConnectionError,
-                    requests.exceptions.HTTPError) as e:
+                    requests.exceptions.HTTPError,
+                    requests.exceptions.ProxyError) as e:
                 period = 60
                 console.log(
                     f"{e}: Sleepping {period} seconds and "
