@@ -1,4 +1,3 @@
-import re
 import select
 import sys
 import time
@@ -16,7 +15,7 @@ from redbook.helper import (
     normalize_user_id,
     print_command, save_log
 )
-from redbook.model import Query, UserConfig
+from redbook.model import UserConfig
 
 app = Typer()
 
@@ -95,13 +94,6 @@ def user_loop(frequency: float = 2,
                 logsaver.save_log(save_manually=True)
                 print_command()
 
-        for search_query, remark in get_user_search_query():
-            if start_time.diff().in_minutes() > WORKING_TIME:
-                break
-            Query.search(search_query, remark)
-            console.log('waiting for 120 seconds to fetching next user')
-            time.sleep(120)
-
         console.log(
             f'have been working for {start_time.diff().in_minutes()}m '
             f'which is more than {WORKING_TIME}m, taking a break')
@@ -177,22 +169,3 @@ def write_meta(download_dir: Path = default_path):
         if ori.exists():
             write_meta(ori)
             rename(ori, new_dir=True, root=ori.parent / (ori.stem + 'Pro'))
-
-
-def get_user_search_query():
-
-    from sinaspider.model import UserConfig as SinaConfig
-    sina_users = (SinaConfig.select()
-                  .where(SinaConfig.weibo_fetch)
-                  .where(SinaConfig.weibo_fetch_at.is_null(False))
-                  .where(SinaConfig.photos_num > 0)
-                  .order_by(SinaConfig.id.desc())
-                  )
-    for u in sina_users:
-        query = u.nickname
-        remark = u.username
-        if re.search(r'[\u4e00-\u9fff·]', query):
-            continue
-        if Query.get_or_none(query=query):
-            continue
-        yield query, remark

@@ -19,7 +19,7 @@ from playhouse.shortcuts import model_to_dict
 
 from redbook import console
 from redbook.helper import download_files
-from redbook.redbook import get_note, get_user, get_user_notes, search_user
+from redbook.redbook import get_note, get_user, get_user_notes
 
 database = PostgresqlExtDatabase("redbook", host="localhost")
 
@@ -439,44 +439,5 @@ class Artist(BaseModel):
         return {"XMP:" + k: v for k, v in xmp.items()}
 
 
-class Query(BaseModel):
-    user_id = TextField()
-    red_id = CharField()
-    remark = CharField()
-    query = CharField()
-    nickname = CharField()
-    fans = IntegerField()
-    note_count = IntegerField()
-    update_time = TextField(null=True)
-    homepage = TextField()
-    avatar = TextField()
-    followed = BooleanField()
-    query_url = TextField()
-    red_official_verify_type = IntegerField()
-    show_red_official_verify_icon = BooleanField()
-    vshow = IntegerField()
-    is_self = BooleanField()
-    red_official_verified = BooleanField()
-    profession = TextField(null=True)
-
-    class Meta:
-        indexes = (
-            (('user_id', 'query'), True),
-        )
-
-    @classmethod
-    def search(cls, query: str, remark: str):
-        if not cls.get_or_none(query=query):
-            console.log(f'searching {query}..')
-            users = list(search_user(query))
-            assert users
-            for u in users:
-                u['remark'] = remark
-            cls.insert_many(users).execute()
-        else:
-            cls.update(remark=remark).where(cls.query == query).execute()
-        return cls.select().where(cls.query == query)
-
-
 database.create_tables(
-    [User, UserConfig, Note, Artist, Query])
+    [User, UserConfig, Note, Artist])
