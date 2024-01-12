@@ -5,6 +5,7 @@ from typing import Iterator, Self
 
 import pendulum
 from peewee import Model
+from photosinfo.model import GirlSearch
 from playhouse.postgres_ext import (
     ArrayField, BooleanField,
     CharField,
@@ -67,6 +68,7 @@ class User(BaseModel):
     avatar = TextField()
     added_at = DateTimeTZField(null=True, default=pendulum.now)
     redirect = TextField(null=True)
+    search_results = GirlSearch.get_search_results()['red']
 
     @classmethod
     def from_id(cls, user_id: str, update=False) -> Self:
@@ -82,8 +84,10 @@ class User(BaseModel):
     def upsert(cls, user_dict: dict):
         user_id = user_dict['id']
         if not (model := cls.get_or_none(id=user_id)):
-            user_dict['username'] = user_dict['nickname'].strip('-_ ')
-            assert user_dict['username']
+            if not (username := cls.search_results.get(user_id)):
+                username = user_dict['nickname'].strip('-_ ')
+            assert username
+            user_dict['username'] = username
             return cls.insert(user_dict).execute()
         model_dict = model_to_dict(model)
 
@@ -174,6 +178,7 @@ class UserConfig(BaseModel):
         if self.note_fetch_at:
             since = pendulum.instance(self.note_fetch_at)
         else:
+            Artist.from_id(self.user_id)
             since = pendulum.from_timestamp(0)
         if self.note_fetch_at:
             estimated_post = int(since.diff().in_hours() / self.post_cycle)
