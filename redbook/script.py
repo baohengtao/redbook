@@ -149,9 +149,9 @@ def user(download_dir: Path = default_path):
         uc.note_fetch = Confirm.ask(f"是否获取{uc.username}的主页？", default=True)
         uc.save()
         console.log(f'用户{uc.username}更新完成')
-        if uc.note_fetch and not uc.followed:
+        if uc.note_fetch and not uc.following:
             console.log(f'用户{uc.username}未关注，记得关注🌸', style='notice')
-        elif not uc.note_fetch and uc.followed:
+        elif not uc.note_fetch and uc.following:
             console.log(f'用户{uc.username}已关注，记得取关🔥', style='notice')
         if not uc.note_fetch and Confirm.ask('是否删除该用户？', default=False):
             uc.delete_instance()

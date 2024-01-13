@@ -54,7 +54,7 @@ class User(BaseModel):
     age = CharField(null=True)
     description = TextField(null=True)
     homepage = TextField()
-    followed = BooleanField()
+    following = BooleanField()
     location = CharField(null=True)
     ip_location = CharField(null=True)
     college = TextField(null=True)
@@ -75,7 +75,7 @@ class User(BaseModel):
         if update or not cls.get_or_none(id=user_id):
             for _ in range(3):
                 user_dict = get_user(user_id)
-                if user_dict['followed']:
+                if user_dict['following']:
                     break
             cls.upsert(user_dict)
         return cls.get_by_id(user_id)
@@ -115,7 +115,7 @@ class UserConfig(BaseModel):
     age = CharField(null=True)
     description = TextField(null=True)
     homepage = TextField()
-    followed = BooleanField()
+    following = BooleanField()
     location = CharField(null=True)
     ip_location = CharField(null=True)
     college = TextField(null=True)
@@ -275,7 +275,7 @@ class Note(BaseModel):
     id = TextField(primary_key=True, unique=True)
     user = ForeignKeyField(User, backref="notes")
     username = CharField()
-    followed = BooleanField()
+    following = BooleanField()
     title = TextField(null=True)
     desc = TextField(null=True)
     time = DateTimeTZField()
@@ -306,7 +306,7 @@ class Note(BaseModel):
             user: User = User.get_by_id(note_dict['user_id'])
             assert note_dict.pop('avatar') == user.avatar
             assert note_dict.pop('nickname') == user.nickname
-            assert note_dict['followed'] == user.followed
+            assert note_dict['following'] == user.following
             note_dict['username'] = user.username
             cls.upsert(note_dict)
         return cls.get_by_id(note_id)
@@ -395,7 +395,7 @@ class Artist(BaseModel):
     photos_num = IntegerField(default=0)
     description = TextField(null=True)
     homepage = CharField(null=True)
-    followed = BooleanField()
+    following = BooleanField()
     location = CharField(null=True)
     ip_location = CharField(null=True)
     college = TextField(null=True)

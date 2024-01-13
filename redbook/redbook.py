@@ -82,12 +82,12 @@ def _parse_user(user_info: dict) -> dict:
     for key in ['follows', 'fans', 'interaction']:
         user[key] = int(user[key])
 
-    assert 'followed' not in user
+    assert 'following' not in user
     if (fstatus := user.pop('fstatus')) in ['follows', 'both']:
-        user['followed'] = True
+        user['following'] = True
     else:
         assert fstatus == 'none'
-        user['followed'] = False
+        user['following'] = False
 
     tab_public = user.pop('tabPublic')
     collection_public = tab_public.pop('collection')
@@ -104,7 +104,7 @@ def _parse_user(user_info: dict) -> dict:
     user = {k: v for k, v in user.items() if v not in [None, [], '']}
 
     keys = ['id', 'red_id', 'nickname', 'age', 'description', 'homepage',
-            'followed', 'location', 'ip_location', 'college']
+            'following', 'location', 'ip_location', 'college']
     user1 = {k: user[k] for k in keys if k in user}
     user2 = {k: user[k] for k in user if k not in keys}
     user_sorted = user1 | user2
@@ -179,11 +179,11 @@ def _parse_note(note: dict) -> dict:
     assert 'id' not in note
     note['id'] = note.pop('note_id')
     if (relation := note.pop('relation')) in ['follows', 'both']:
-        assert note['followed'] is True
+        assert note['following'] is True
     else:
         assert relation == 'none'
-        assert note['followed'] is False
-    # relation = 'follows' if note['followed'] else 'none'
+        assert note['following'] is False
+    # relation = 'follows' if note['following'] else 'none'
     # assert relation == note.pop('relation')
 
     for k in ['time', 'last_update_time']:
@@ -241,7 +241,7 @@ def _parse_note(note: dict) -> dict:
             note[k] = note[k].replace('\x0b', ' ').strip()
     note = {k: v for k, v in note.items() if v not in [None, [], '', {}]}
 
-    keys = ['id', 'user_id', 'nickname',   'followed', 'title',
+    keys = ['id', 'user_id', 'nickname',   'following', 'title',
             'desc', 'time', 'last_update_time',
             'ip_location', 'at_user', 'topics', 'url',
             'comment_count', 'share_count', 'liked', 'liked_count',
