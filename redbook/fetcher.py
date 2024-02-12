@@ -48,10 +48,11 @@ class Fetcher:
 
     def get(self, url, api='') -> requests.Response:
         self._pause()
-        if not api:
-            return self.sess.get(url)
-        headers = self.sess.headers | self._get_xs(api)
-        url += api
+        if api:
+            headers = self.sess.headers | self._get_xs(api)
+            url += api
+        else:
+            headers = None
         while True:
             try:
                 r = self.sess.get(url, headers=headers)

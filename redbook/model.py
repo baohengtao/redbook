@@ -72,11 +72,13 @@ class User(BaseModel):
 
     @classmethod
     def from_id(cls, user_id: str, update=False) -> Self:
-        if update or not cls.get_or_none(id=user_id):
+        if not (model := cls.get_or_none(id=user_id)) or update:
             for _ in range(3):
                 user_dict = get_user(user_id)
-                if user_dict['following']:
+                if not model or user_dict['following'] == model.following:
                     break
+            if not model:
+                assert user_dict['following'] is True
             cls.upsert(user_dict)
         return cls.get_by_id(user_id)
 
@@ -181,8 +183,8 @@ class UserConfig(BaseModel):
             Artist.from_id(self.user_id)
             since = pendulum.from_timestamp(0)
         if self.note_fetch_at:
-            estimated_post = int(since.diff().in_hours() / self.post_cycle)
-            estimated_post = f'estimated_new_posts:{estimated_post}'
+            estimated_post = since.diff().in_hours() / self.post_cycle
+            estimated_post = f'estimated_new_posts:{estimated_post:.2f}'
             msg = f' (fetch_at:{since:%y-%m-%d} {estimated_post})'
         else:
             msg = ''

@@ -178,6 +178,8 @@ def _parse_note(note: dict) -> dict:
     assert note.pop('un_share') is False
     assert 'id' not in note
     note['id'] = note.pop('note_id')
+    assert 'following' not in note
+    note['following'] = note.pop('followed')
     if (relation := note.pop('relation')) in ['follows', 'both']:
         assert note['following'] is True
     else:

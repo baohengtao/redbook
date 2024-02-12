@@ -1,3 +1,4 @@
+import itertools
 import select
 import sys
 import time
@@ -15,7 +16,7 @@ from redbook.helper import (
     normalize_user_id,
     print_command, save_log
 )
-from redbook.model import UserConfig
+from redbook.model import Artist, User, UserConfig
 
 app = Typer()
 
@@ -134,9 +135,11 @@ def user_loop(frequency: float = 2,
 def user(download_dir: Path = default_path):
     """Add user to database of users whom we want to fetch from"""
     UserConfig.update_table()
-    user = UserConfig.select().order_by(UserConfig.id.desc()).first()
+    config = UserConfig.select().order_by(UserConfig.id.desc()).first()
+    user = config.user
     console.log(f'total {UserConfig.select().count()} users in database')
-    console.log(f'the latest added user is {user.username}({user.user_id})')
+    console.log(
+        f'the latest added user is {user.username} ({user.id, user.nickname})')
 
     while user_id := Prompt.ask('请输入用户名:smile:').strip():
         if uc := UserConfig.get_or_none(username=user_id):
