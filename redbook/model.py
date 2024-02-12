@@ -174,7 +174,7 @@ class UserConfig(BaseModel):
                     hours=config.post_cycle/2)
             config.save()
 
-    def fetch_note(self, download_dir: Path, update_note: bool = True):
+    def fetch_note(self, download_dir: Path):
         if not self.note_fetch:
             return
         if self.note_fetch_at:
@@ -193,8 +193,7 @@ class UserConfig(BaseModel):
         console.log(f"Media Saving: {download_dir}")
 
         now = pendulum.now()
-        imgs = self._save_notes(
-            since, download_dir, update_note=update_note)
+        imgs = self._save_notes(since, download_dir)
         download_files(imgs)
         console.log(f"{self.username} 📕 获取完毕\n")
 
@@ -207,8 +206,7 @@ class UserConfig(BaseModel):
     def _save_notes(
             self,
             since: pendulum.DateTime,
-            download_dir: Path,
-            update_note: bool = True,
+            download_dir: Path
     ) -> Iterator[dict]:
         """
         Save weibo to database and return media info
@@ -243,7 +241,7 @@ class UserConfig(BaseModel):
                             "获取完毕")
                         break
 
-            note = Note.from_id(note_info['id'], update=update_note)
+            note = Note.from_id(note_info['id'])
             if note.time < since:
                 console.log(
                     f'find note {note.id} before {since:%y-%m-%d} '
@@ -258,7 +256,7 @@ class UserConfig(BaseModel):
                             f"{[note.title, note.desc]}", style='error')
             for k, v in note_info.items():
                 if getattr(note, k) != v:
-                    assert not update_note and k == 'liked_count'
+                    assert k == 'liked_count'
             if not sticky:
                 note_time_order.append(note.time)
 
@@ -296,21 +294,25 @@ class Note(BaseModel):
     pic_ids = ArrayField(field_class=TextField)
     pics = ArrayField(field_class=TextField)
     video = TextField(null=True)
-    added_at = TextField(null=True)
-    updated_at = TextField(null=True)
+    added_at = DateTimeTZField(null=True)
+    updated_at = DateTimeTZField(null=True)
 
     @classmethod
-    def from_id(cls, note_id, update=False) -> Self:
+    def from_id(cls, note_id, update=None) -> Self:
         note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
-        if update or not cls.get_or_none(id=note_id):
-            note_dict = get_note(note_id)
-            note_dict = {k: v for k, v in note_dict.items() if v != []}
-            user: User = User.get_by_id(note_dict['user_id'])
-            assert note_dict.pop('avatar') == user.avatar
-            assert note_dict.pop('nickname') == user.nickname
-            assert note_dict['following'] == user.following
-            note_dict['username'] = user.username
-            cls.upsert(note_dict)
+        if not update and (note := cls.get_or_none(id=note_id)):
+            date = note.updated_at or note.added_at
+            if update is False or (pendulum.now() - date).in_hours() < 24:
+                return note
+
+        note_dict = get_note(note_id)
+        note_dict = {k: v for k, v in note_dict.items() if v != []}
+        user: User = User.get_by_id(note_dict['user_id'])
+        assert note_dict.pop('avatar') == user.avatar
+        assert note_dict.pop('nickname') == user.nickname
+        assert note_dict['following'] == user.following
+        note_dict['username'] = user.username
+        cls.upsert(note_dict)
         return cls.get_by_id(note_id)
 
     @classmethod
@@ -332,14 +334,15 @@ class Note(BaseModel):
                 continue
             if key == 'pics':
                 continue
-            assert key not in ['pic_ids', 'video', 'video_md5']
+            if key in ['pic_ids', 'video', 'video_md5']:
+                assert note_dict['last_update_time'] > model.last_update_time
             console.log(f'+{key}: {value}', style='green bold on dark_green')
             if ori is not None:
                 console.log(f'-{key}: {ori}', style='red bold on dark_red')
         return cls.update(note_dict).where(cls.id == note_id).execute()
 
     def medias(self, filepath: Path = None) -> Iterator[dict]:
-        prefix = f'{self.time:%y-%m-%d}_{self.username}_{self.id}'
+        prefix = f'{self.last_update_time:%y-%m-%d}_{self.username}_{self.id}'
         for sn, url in enumerate(self.pics, start=1):
             yield {
                 'url': url,

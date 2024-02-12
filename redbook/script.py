@@ -54,8 +54,6 @@ class LogSaver:
 @logsaver_decorator
 def user_loop(frequency: float = 2,
               download_dir: Path = default_path,
-              update_note: bool = Option(
-                  False, "--update-note", "-u", help="Update note of user")
               ):
 
     WORKING_TIME = 20
@@ -90,7 +88,7 @@ def user_loop(frequency: float = 2,
             console.log(f'fetching {i+1}/{len(configs)}: {config.username}')
             config = UserConfig.from_id(user_id=config.user_id)
             is_new = config.note_fetch_at is None
-            config.fetch_note(download_dir, update_note=update_note)
+            config.fetch_note(download_dir)
             if is_new:
                 logsaver.save_log(save_manually=True)
                 print_command()
