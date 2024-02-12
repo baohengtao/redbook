@@ -172,3 +172,18 @@ def write_meta(download_dir: Path = default_path):
         if ori.exists():
             write_meta(ori)
             rename(ori, new_dir=True, root=ori.parent / (ori.stem + 'Pro'))
+
+
+@app.command()
+def database_clean():
+    for u in User:
+        if (u.artist and u.artist[0].photos_num) or u.config:
+            continue
+        console.log(u, '\n')
+        for n in itertools.chain(u.config, u.artist):
+            console.log(n, '\n')
+        if Confirm.ask(f'是否删除{u.username}({u.id})？', default=False):
+            for n in itertools.chain(u.notes, u.config, u.artist):
+                n.delete_instance()
+            u.delete_instance()
+            console.log(f'用户{u.username}已删除')
