@@ -75,10 +75,12 @@ class Fetcher:
         headers = self.sess.headers | self._get_xs(api, data)
         url += api
         while True:
-            r = self.sess.post(url, headers=headers, data=data)
             try:
+                r = self.sess.post(url, headers=headers, data=data)
                 r.raise_for_status()
-            except requests.exceptions.HTTPError as e:
+            except (requests.exceptions.ConnectionError,
+                    requests.exceptions.HTTPError,
+                    requests.exceptions.ProxyError) as e:
                 period = 60
                 console.log(
                     f"{e}: Sleeping {period} seconds and "

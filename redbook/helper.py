@@ -71,7 +71,7 @@ def download_single_file(
     while True:
         try:
             r = requests.get(url, headers=headers)
-        except ConnectionError as e:
+        except requests.exceptions.ConnectionError as e:
             period = 60
             console.log(
                 f"{e}: Sleepping {period} seconds and "

@@ -101,6 +101,8 @@ def _parse_user(user_info: dict) -> dict:
     else:
         user['verified'] = False
 
+    assert user.pop('blockType') == 'DEFAULT'
+
     user = {k: v for k, v in user.items() if v not in [None, [], '']}
 
     keys = ['id', 'red_id', 'nickname', 'age', 'description', 'homepage',

@@ -170,8 +170,9 @@ class UserConfig(BaseModel):
                 config.photos_num = 0
             if config.note_fetch_at:
                 config.post_cycle = config.get_post_cycle()
-                config.note_next_fetch = config.note_fetch_at + pendulum.Duration(
-                    hours=config.post_cycle/2)
+                config.note_next_fetch = (
+                    config.note_fetch_at +
+                    pendulum.Duration(hours=config.post_cycle))
             config.save()
 
     def fetch_note(self, download_dir: Path):
@@ -200,7 +201,7 @@ class UserConfig(BaseModel):
         self.note_fetch_at = now
         self.post_at = self.user.notes.order_by(Note.time.desc()).first().time
         self.post_cycle = self.get_post_cycle()
-        self.note_next_fetch = now.add(hours=self.post_cycle/2)
+        self.note_next_fetch = now.add(hours=self.post_cycle)
         self.save()
 
     def _save_notes(

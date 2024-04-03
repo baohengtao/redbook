@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pendulum
 from rich.prompt import Confirm, Prompt
-from typer import Option, Typer
+from typer import Typer
 
 from redbook import console
 from redbook.fetcher import fetcher
@@ -16,7 +16,7 @@ from redbook.helper import (
     normalize_user_id,
     print_command, save_log
 )
-from redbook.model import Artist, User, UserConfig
+from redbook.model import User, UserConfig
 
 app = Typer()
 
@@ -75,13 +75,18 @@ def user_loop(frequency: float = 2,
         elif configs := query.where(UserConfig.note_next_fetch < pendulum.now()):
             console.log(
                 f' {len(configs)} users satisfy fetching conditions, '
-                'Fetching 5 users whose estimated new notes is most')
-            configs = configs[:5]
+                'Fetching 10 users whose estimated new notes is most')
+            configs = configs[:10]
         else:
-            configs = query.order_by(UserConfig.note_fetch_at).limit(2)
+            configs = query.order_by(UserConfig.note_fetch_at)
+            if configs[0].note_fetch_at < pendulum.now().subtract(days=15):
+                limit = 5
+            else:
+                limit = 2
             console.log(
                 'no user satisfy fetching conditions, '
-                'fetching 2 users whose note_fetch_at is earliest.')
+                f'fetching {limit} users whose note_fetch_at is earliest.')
+            configs = configs[:limit]
         for i, config in enumerate(configs):
             if start_time.diff().in_minutes() > WORKING_TIME:
                 break
