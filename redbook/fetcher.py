@@ -1,13 +1,13 @@
-import http.cookies
 import json
 import os
+import pickle
 import random
 import time
 from pathlib import Path
 
 import execjs
 import requests
-from dotenv import load_dotenv
+from DrissionPage import ChromiumPage
 
 from redbook import console
 
@@ -17,14 +17,7 @@ os.environ['NODE_PATH'] = str(NODE_PATH)
 
 
 def _get_session():
-    env_file = Path(__file__).with_name('.env')
-    load_dotenv(env_file)
-    if not (cookie := os.getenv('COOKIE')):
-        raise ValueError(f'no cookie found in {env_file}')
-    cookie_dict = http.cookies.SimpleCookie(cookie)
-    cookies = {k: v.value for k, v in cookie_dict.items()}
     sess = requests.Session()
-    sess.cookies = requests.utils.cookiejar_from_dict(cookies)
     sess.headers = {
         "authority": "edith.xiaohongshu.com",
         "accept": "application/json, text/plain, */*",
@@ -33,8 +26,6 @@ def _get_session():
         "origin": "https://www.xiaohongshu.com",
         "referer": "https://www.xiaohongshu.com/",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188",
-        # "x-s": "",
-        # "x-t": ""
     }
     return sess
 
@@ -42,9 +33,43 @@ def _get_session():
 class Fetcher:
     def __init__(self) -> None:
         self.sess = _get_session()
+        self.load_cookie()
         self._visit_count = 0
         self.visits = 0
         self._last_fetch = time.time()
+
+    def login(self):
+        while True:
+            r = self.get('https://edith.xiaohongshu.com',
+                         api='/api/sns/web/v2/user/me')
+            js = r.json()
+            if js.pop('success'):
+                return js["data"]["nickname"]
+            else:
+                console.log(js)
+            # assert js.pop('msg') == '登录已过期'
+            self.get_cookie()
+
+    def get_cookie(self):
+        browser = ChromiumPage()
+        browser.get('https://www.xiaohongshu.com/')
+        input('press enter after login...')
+        for cookie in browser.get_cookies():
+            # for k in ['expiry', 'httpOnly', 'sameSite']:
+            # cookie.pop(k, None)
+            self.sess.cookies.set(**cookie)
+        browser.quit()
+        self.save_cookie()
+
+    def load_cookie(self):
+        cookie_file = Path(__file__).with_name('cookie.pkl')
+        while not cookie_file.exists():
+            self.get_cookie()
+        self.sess.cookies = pickle.loads(cookie_file.read_bytes())
+
+    def save_cookie(self):
+        cookie_file = Path(__file__).with_name('cookie.pkl')
+        cookie_file.write_bytes(pickle.dumps(self.sess.cookies))
 
     def get(self, url, api='') -> requests.Response:
         self._pause()

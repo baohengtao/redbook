@@ -55,6 +55,7 @@ class LogSaver:
 def user_loop(frequency: float = 2,
               download_dir: Path = default_path,
               ):
+    console.log(f'current logined as: {fetcher.login()}')
 
     WORKING_TIME = 20
     logsaver = LogSaver('user_loop', download_dir)
