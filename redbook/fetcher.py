@@ -7,7 +7,7 @@ from pathlib import Path
 
 import execjs
 import requests
-from DrissionPage import ChromiumPage
+from DrissionPage import ChromiumOptions, ChromiumPage
 
 from redbook import console
 
@@ -51,7 +51,8 @@ class Fetcher:
             self.get_cookie()
 
     def get_cookie(self):
-        browser = ChromiumPage()
+        co = ChromiumOptions().use_system_user_path()
+        browser = ChromiumPage(co)
         browser.get('https://www.xiaohongshu.com/')
         input('press enter after login...')
         for cookie in browser.get_cookies():
@@ -85,9 +86,11 @@ class Fetcher:
             except (requests.exceptions.ConnectionError,
                     requests.exceptions.HTTPError,
                     requests.exceptions.ProxyError) as e:
+                if r.status_code == 461:
+                    raise
                 period = 60
                 console.log(
-                    f"{e}: Sleepping {period} seconds and "
+                    f"{e}: Sleeping {period} seconds and "
                     f"retry [link={url}]{url}[/link]...", style='error')
                 time.sleep(period)
             else:

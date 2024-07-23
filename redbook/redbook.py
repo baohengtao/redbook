@@ -89,10 +89,7 @@ def _parse_user(user_info: dict) -> dict:
         assert fstatus == 'none'
         user['following'] = False
 
-    tab_public = user.pop('tabPublic')
-    collection_public = tab_public.pop('collection')
-    assert not tab_public
-    user['collection_public'] = collection_public
+    user['collection_public'] = user.pop('tabPublic')['collection']
 
     assert 'verified' not in user
     if verifyInfo := user.pop('verifyInfo', None):
@@ -119,7 +116,7 @@ def get_user_notes(user_id: str) -> Iterator[dict]:
     cursor = ''
     for page in itertools.count(start=1):
         console.log(f'fetching page {page}...')
-        api = ("/api/sns/web/v1/user_posted?num=30&image_scenes="
+        api = ("/api/sns/web/v1/user_posted?num=30&image_formats=jpg,webp,avif"
                f"&cursor={cursor}&user_id={user_id}")
         url = 'https://edith.xiaohongshu.com'
         js = fetcher.get(url=url, api=api).json()
