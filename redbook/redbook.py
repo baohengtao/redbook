@@ -4,6 +4,7 @@ import time
 from typing import Iterator
 
 import pendulum
+from camel_converter import dict_to_snake
 
 from redbook import console
 from redbook.fetcher import fetcher
@@ -14,9 +15,12 @@ def get_user(user_id: str, parse: bool = True) -> dict:
     while True:
         url = f"https://www.xiaohongshu.com/user/profile/{user_id}"
         r = fetcher.get(url)
-        assert (c := r.status_code) != 503
-        info = re.findall(
-            r'<script>window.__INITIAL_STATE__=(.*?)</script>', r.text)[0]
+        try:
+            info = re.findall(
+                r'<script>window.__INITIAL_STATE__=(.*?)</script>', r.text)[0]
+        except Exception:
+            console.log(f'find failed: {r.text}', style='error')
+            raise
         info = convert_js_dict_to_py(info)
         user_info = info['user']['userPageData']
 
@@ -141,21 +145,17 @@ def get_user_notes(user_id: str) -> Iterator[dict]:
         assert cursor
 
 
-def get_note(note_id, parse=True):
+def get_note(note_id, params: str = '', parse=True):
     note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
-    note_data = {'source_note_id': note_id,
-                 'image_scenes': ['CRD_PRV_WEBP', 'CRD_WM_WEBP']}
-    r = fetcher.post('https://edith.xiaohongshu.com',
-                     '/api/sns/web/v1/feed', note_data)
-    js = r.json()
-    data = js.pop('data')
-    assert js == {'code': 0, 'success': True, 'msg': '成功'}
-    items = data.pop('items')
-    assert len(items) == 1
-    item = items[0]
-    note = item.pop('note_card')
+    r = fetcher.get(f'https://www.xiaohongshu.com/explore/{note_id}{params}')
+    info = re.findall(
+        r'<script>window.__INITIAL_STATE__=(.*?)</script>', r.text)[0]
+    note = convert_js_dict_to_py(info)['note']['noteDetailMap']
+    k, v = note.popitem()
+    assert not note
+    note = v.pop('note')
+    note = dict_to_snake(note)
     note['url'] = f'https://www.xiaohongshu.com/explore/{note_id}'
-    assert item == {'id': note_id, 'model_type': 'note'}
     try:
         return _parse_note(note) if parse else note
     except AssertionError:
@@ -163,7 +163,7 @@ def get_note(note_id, parse=True):
         raise
 
 
-def _parse_note(note: dict) -> dict:
+def _parse_note(note):
     for key in ['user',  'share_info', 'interact_info']:
         value = note.pop(key)
         assert note | value == value | note
@@ -212,18 +212,28 @@ def _parse_note(note: dict) -> dict:
     assert len(at_user) == len(at_user_list)
     note['at_user'] = at_user
 
-    image_list = note.pop('image_list')
     pics = []
-    for image in image_list:
-        image = {k: v for k, v in image.items() if v and k not in [
+    for image in note.pop('image_list'):
+        image = {k: v for k, v in image.items() if (v is False or v) and k not in [
             'height', 'width']}
         info_list = image.pop('info_list')
+        assert all(len(i) == 2 for i in info_list)
+        info_list = {i['image_scene']: i['url'] for i in info_list}
+        pic = image.pop('url_default')
+        assert pic == info_list.pop('WB_DFT')
+        assert image.pop('url_pre') == info_list.pop('WB_PRV')
+        assert not info_list
+        if image.pop('live_photo') is True:
+            stream = {k: v for k, v in image.pop('stream').items() if v}
+            assert len(stream) == 1
+            pic += '⭐️'+stream.pop('h264')[0]['master_url']
         assert not image
-        image = {i['image_scene']: i['url'] for i in info_list}
-        pics.append(image['CRD_WM_WEBP'])
+
+        pics.append(pic)
     assert 'pics' not in note
     note['pics'] = pics
-    note['pic_ids'] = [pic.split('/')[-1] for pic in pics]
+    note['pic_ids'] = [pic.split('⭐️')[0].split(
+        '/')[-1].split('!')[0] for pic in pics]
 
     if 'video' in note:
         stream = note.pop('video').pop('media').pop('stream')

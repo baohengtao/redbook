@@ -5,11 +5,11 @@ import random
 import time
 from pathlib import Path
 
-import execjs
 import requests
 from DrissionPage import ChromiumOptions, ChromiumPage
 
 from redbook import console
+from redbook.client.client_sync import GetXS
 
 NODE_PATH = Path(__file__).resolve().parent.parent
 NODE_PATH /= 'node_modules'
@@ -19,9 +19,6 @@ os.environ['NODE_PATH'] = str(NODE_PATH)
 def _get_session():
     sess = requests.Session()
     sess.headers = {
-        "authority": "edith.xiaohongshu.com",
-        "accept": "application/json, text/plain, */*",
-        "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
         "content-type": "application/json;charset=UTF-8",
         "origin": "https://www.xiaohongshu.com",
         "referer": "https://www.xiaohongshu.com/",
@@ -33,7 +30,8 @@ def _get_session():
 class Fetcher:
     def __init__(self) -> None:
         self.sess = _get_session()
-        self.load_cookie()
+        self.cookies = self.load_cookie()
+        self.xs_getter = GetXS(self.cookies)
         self._visit_count = 0
         self.visits = 0
         self._last_fetch = time.time()
@@ -47,38 +45,32 @@ class Fetcher:
                 return js["data"]["nickname"]
             else:
                 console.log(js)
-            # assert js.pop('msg') == '登录已过期'
-            self.get_cookie()
-
-    def get_cookie(self):
-        co = ChromiumOptions().use_system_user_path()
-        browser = ChromiumPage(co)
-        browser.get('https://www.xiaohongshu.com/')
-        input('press enter after login...')
-        for cookie in browser.get_cookies():
-            # for k in ['expiry', 'httpOnly', 'sameSite']:
-            # cookie.pop(k, None)
-            self.sess.cookies.set(**cookie)
-        browser.quit()
-        self.save_cookie()
+            Path(__file__).with_name('cookie.pkl').unlink(missing_ok=True)
+            raise ValueError('not logined')
 
     def load_cookie(self):
         cookie_file = Path(__file__).with_name('cookie.pkl')
-        while not cookie_file.exists():
-            self.get_cookie()
-        self.sess.cookies = pickle.loads(cookie_file.read_bytes())
-
-    def save_cookie(self):
-        cookie_file = Path(__file__).with_name('cookie.pkl')
-        cookie_file.write_bytes(pickle.dumps(self.sess.cookies))
+        if cookie_file.exists():
+            cookies = pickle.loads(cookie_file.read_bytes())
+        else:
+            co = ChromiumOptions().use_system_user_path()
+            browser = ChromiumPage(co)
+            browser.get('https://www.xiaohongshu.com/')
+            input('press enter after login...')
+            cookies = browser.get_cookies()
+            browser.quit()
+            cookie_file = Path(__file__).with_name('cookie.pkl')
+            cookie_file.write_bytes(pickle.dumps(cookies))
+        cookie_str = ';'.join(
+            f"{cookie['name']}={cookie['value']}" for cookie in cookies)
+        self.sess.headers['Cookie'] = cookie_str
+        return cookies
 
     def get(self, url, api='') -> requests.Response:
+        console.log(f'Getting {url}, {api}')
         self._pause()
-        if api:
-            headers = self.sess.headers | self._get_xs(api)
-            url += api
-        else:
-            headers = None
+        url += api
+        headers = self._get_xs(api) if api else None
         while True:
             try:
                 r = self.sess.get(url, headers=headers)
@@ -98,9 +90,10 @@ class Fetcher:
                 return r
 
     def post(self, url, api, data: dict):
+        console.log(f'Posting {url}, {api}, {data}')
         self._pause()
         data = json.dumps(data, separators=(',', ':'))
-        headers = self.sess.headers | self._get_xs(api, data)
+        headers = self._get_xs(api, data)
         url += api
         while True:
             try:
@@ -119,11 +112,7 @@ class Fetcher:
                 return r
 
     def _get_xs(self, api, data=''):
-        a1 = self.sess.cookies.get('a1')
-        jsfile = Path(__file__).with_name('info.js')
-        js = execjs.compile(open(jsfile, 'r', encoding='utf-8').read())
-        ret = js.call('get_xs', api, data, a1)
-        return {k.lower(): str(v) for k, v in ret.items()}
+        return self.xs_getter.get_header(api, data)
 
     def _pause(self):
         self.visits += 1
