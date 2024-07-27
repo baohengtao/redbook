@@ -14,9 +14,13 @@ class GetXS:
         self.cookies = cookies
         self.client = None
 
-    async def get_header(self, api, data=''):
+    async def init_client(self):
         if not self.client:
             self.client = await get_client(self.cookies)
+        return self.client
+
+    async def get_header(self, api, data=''):
+        await self.init_client()
         xs = (await self.client._pre_headers(api, data)) if api else {}
         return self.client.headers | xs
 

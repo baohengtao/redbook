@@ -85,10 +85,9 @@ class Fetcher:
                 return r
 
     async def post(self, url, api, data: dict):
-        console.log(f'Posting {url}, {api}, {data}')
         self._pause()
-        data = json.dumps(data, separators=(',', ':'))
         headers = await self._get_xs(api, data)
+        data = json.dumps(data, separators=(',', ':'))
         url += api
         while True:
             try:
