@@ -1,7 +1,9 @@
+import asyncio
 import itertools
 import select
 import sys
 import time
+from functools import wraps
 from pathlib import Path
 
 import pendulum
@@ -19,6 +21,17 @@ from redbook.helper import (
 from redbook.model import User, UserConfig
 
 app = Typer()
+
+
+def run_async(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        async def coro_wrapper():
+            return await func(*args, **kwargs)
+
+        return asyncio.run(coro_wrapper())
+
+    return wrapper
 
 
 class LogSaver:
@@ -52,10 +65,11 @@ class LogSaver:
 
 @app.command()
 @logsaver_decorator
-def user_loop(frequency: float = 2,
-              download_dir: Path = default_path,
-              ):
-    console.log(f'current logined as: {fetcher.login()}')
+@run_async
+async def user_loop(frequency: float = 2,
+                    download_dir: Path = default_path,
+                    ):
+    console.log(f'current logined as: {await fetcher.login()}')
 
     WORKING_TIME = 20
     logsaver = LogSaver('user_loop', download_dir)
@@ -92,9 +106,9 @@ def user_loop(frequency: float = 2,
             if start_time.diff().in_minutes() > WORKING_TIME:
                 break
             console.log(f'fetching {i+1}/{len(configs)}: {config.username}')
-            config = UserConfig.from_id(user_id=config.user_id)
+            config = await UserConfig.from_id(user_id=config.user_id)
             is_new = config.note_fetch_at is None
-            config.fetch_note(download_dir)
+            await config.fetch_note(download_dir)
             if is_new:
                 logsaver.save_log(save_manually=True)
                 print_command()
@@ -102,7 +116,6 @@ def user_loop(frequency: float = 2,
         console.log(
             f'have been working for {start_time.diff().in_minutes()}m '
             f'which is more than {WORKING_TIME}m, taking a break')
-
         logsaver.save_log()
         next_start_time = pendulum.now().add(hours=frequency)
         console.rule(f'waiting for next fetching at {next_start_time:%H:%M:%S}',
@@ -136,7 +149,8 @@ def user_loop(frequency: float = 2,
 
 @app.command(help='Add user to database of users whom we want to fetch from')
 @logsaver_decorator
-def user(download_dir: Path = default_path):
+@run_async
+async def user(download_dir: Path = default_path):
     """Add user to database of users whom we want to fetch from"""
     UserConfig.update_table()
     config = UserConfig.select().order_by(UserConfig.id.desc()).first()
@@ -151,7 +165,7 @@ def user(download_dir: Path = default_path):
         user_id = normalize_user_id(user_id)
         if uc := UserConfig.get_or_none(user_id=user_id):
             console.log(f'用户{uc.username}已在列表中')
-        uc = UserConfig.from_id(user_id)
+        uc = await UserConfig.from_id(user_id)
         console.log(uc)
         uc.note_fetch = Confirm.ask(f"是否获取{uc.username}的主页？", default=True)
         uc.save()
@@ -164,7 +178,7 @@ def user(download_dir: Path = default_path):
             uc.delete_instance()
             console.log('用户已删除')
         elif uc.note_fetch and Confirm.ask('是否现在抓取', default=False):
-            uc.fetch_note(download_dir)
+            await uc.fetch_note(download_dir)
         console.log()
 
 

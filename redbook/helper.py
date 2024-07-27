@@ -3,7 +3,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Iterable
+from typing import AsyncIterable
 
 import execjs
 import pendulum
@@ -45,10 +45,9 @@ def convert_js_dict_to_py(js_dict: str) -> dict:
         raise
 
 
-def download_files(imgs: Iterable[dict]):
-    # TODO: gracefully handle exception and keyboardinterrupt
+async def download_files(imgs: AsyncIterable[dict]):
     with ThreadPoolExecutor(max_workers=7) as pool:
-        futures = [pool.submit(download_single_file, **img) for img in imgs]
+        futures = [pool.submit(download_single_file, **img) async for img in imgs]
     for future in futures:
         future.result()
 

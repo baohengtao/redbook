@@ -18,7 +18,6 @@ class GetXS:
         if not self.client:
             self.client = await get_client(self.cookies)
         xs = (await self.client._pre_headers(api, data)) if api else {}
-        print(xs)
         return self.client.headers | xs
 
 
@@ -30,7 +29,8 @@ async def get_client(cookies=None):
         user_data_dir=user_data_dir,
         viewport={"width": 1920, "height": 1080},
     )
-    await browser_context.add_init_script(path=Path(__file__).parent/'stealth.min.js')
+    await browser_context.add_init_script(
+        path=Path(__file__).parent/'stealth.min.js')
     context_page = await browser_context.new_page()
     await context_page.goto('https://www.xiaohongshu.com')
     xhs_client = XiaoHongShuClient(
@@ -73,8 +73,10 @@ class XiaoHongShuClient:
         self.browser_context = browser_context
 
     async def _pre_headers(self, api: str, data=None) -> dict:
-        encrypt_params = await self.playwright_page.evaluate("([url, data]) => window._webmsxyw(url,data)", [api, data])
-        local_storage = await self.playwright_page.evaluate("()=>window.localStorage")
+        encrypt_params = await self.playwright_page.evaluate(
+            "([url, data]) => window._webmsxyw(url,data)", [api, data])
+        local_storage = await self.playwright_page.evaluate(
+            "()=>window.localStorage")
         signs = sign(
             a1=self.cookie_dict.get("a1", ""),
             b1=local_storage.get("b1", ""),
@@ -109,6 +111,7 @@ class XiaoHongShuClient:
                 'domain': ".xiaohongshu.com",
                 'path': "/"
             }])
-        cookie_str, cookie_dict = convert_cookies(await self.browser_context.cookies())
+        cookie_str, cookie_dict = convert_cookies(
+            await self.browser_context.cookies())
         self.headers['Cookie'] = cookie_str
         self.cookie_dict = cookie_dict

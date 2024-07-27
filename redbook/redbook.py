@@ -11,10 +11,10 @@ from redbook.fetcher import fetcher
 from redbook.helper import convert_js_dict_to_py
 
 
-def get_user(user_id: str, parse: bool = True) -> dict:
+async def get_user(user_id: str, parse: bool = True) -> dict:
     while True:
         url = f"https://www.xiaohongshu.com/user/profile/{user_id}"
-        r = fetcher.get(url)
+        r = await fetcher.get(url)
         try:
             info = re.findall(
                 r'<script>window.__INITIAL_STATE__=(.*?)</script>', r.text)[0]
@@ -116,14 +116,14 @@ def _parse_user(user_info: dict) -> dict:
     return user_sorted
 
 
-def get_user_notes(user_id: str) -> Iterator[dict]:
+async def get_user_notes(user_id: str) -> Iterator[dict]:
     cursor = ''
     for page in itertools.count(start=1):
         console.log(f'fetching page {page}...')
         api = ("/api/sns/web/v1/user_posted?num=30&image_formats=jpg,webp,avif"
                f"&cursor={cursor}&user_id={user_id}")
         url = 'https://edith.xiaohongshu.com'
-        js = fetcher.get(url=url, api=api).json()
+        js = (await fetcher.get(url=url, api=api)).json()
         data = js.pop('data')
         assert js == {'success': True, 'msg': '成功', 'code': 0}
 
@@ -145,9 +145,9 @@ def get_user_notes(user_id: str) -> Iterator[dict]:
         assert cursor
 
 
-def get_note(note_id, params: str = '', parse=True):
+async def get_note(note_id, params: str = '', parse=True):
     note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
-    r = fetcher.get(f'https://www.xiaohongshu.com/explore/{note_id}{params}')
+    r = await fetcher.get(f'https://www.xiaohongshu.com/explore/{note_id}{params}')
     info = re.findall(
         r'<script>window.__INITIAL_STATE__=(.*?)</script>', r.text)[0]
     note = convert_js_dict_to_py(info)['note']['noteDetailMap']

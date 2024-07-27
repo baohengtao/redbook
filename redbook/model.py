@@ -71,10 +71,10 @@ class User(BaseModel):
     search_results = GirlSearch.get_search_results()['red']
 
     @classmethod
-    def from_id(cls, user_id: str, update=False) -> Self:
+    async def from_id(cls, user_id: str, update=False) -> Self:
         if not (model := cls.get_or_none(id=user_id)) or update:
             for _ in range(3):
-                user_dict = get_user(user_id)
+                user_dict = await get_user(user_id)
                 if not model or user_dict['following'] == model.following:
                     break
             if not model:
@@ -127,8 +127,8 @@ class UserConfig(BaseModel):
     added_at = DateTimeTZField(null=True, default=pendulum.now)
 
     @classmethod
-    def from_id(cls, user_id: int) -> Self:
-        user = User.from_id(user_id, update=True)
+    async def from_id(cls, user_id: int) -> Self:
+        user = await User.from_id(user_id, update=True)
         user_dict = model_to_dict(user)
         user_dict['user_id'] = user_dict.pop('id')
         to_insert = {k: v for k, v in user_dict.items()
@@ -139,8 +139,8 @@ class UserConfig(BaseModel):
             cls.insert(to_insert).execute()
         return cls.get(user_id=user_id)
 
-    def page(self) -> Iterator[tuple[dict, str]]:
-        for note in get_user_notes(self.user_id):
+    async def page(self) -> Iterator[tuple[dict, str]]:
+        async for note in get_user_notes(self.user_id):
             assert note.pop('avatar') == self.user.avatar
             assert note.pop('nick_name') == self.user.nickname
             assert note.pop('nickname') == self.user.nickname
@@ -177,13 +177,13 @@ class UserConfig(BaseModel):
                     pendulum.Duration(hours=config.post_cycle))
             config.save()
 
-    def fetch_note(self, download_dir: Path):
+    async def fetch_note(self, download_dir: Path):
         if not self.note_fetch:
             return
         if self.note_fetch_at:
             since = pendulum.instance(self.note_fetch_at)
         else:
-            Artist.from_id(self.user_id)
+            await Artist.from_id(self.user_id)
             since = pendulum.from_timestamp(0)
         if self.note_fetch_at:
             estimated_post = since.diff().in_hours() / self.post_cycle
@@ -197,7 +197,7 @@ class UserConfig(BaseModel):
 
         now = pendulum.now()
         imgs = self._save_notes(since, download_dir)
-        download_files(imgs)
+        await download_files(imgs)
         console.log(f"{self.username} 📕 获取完毕\n")
 
         self.note_fetch_at = now
@@ -206,7 +206,7 @@ class UserConfig(BaseModel):
         self.note_next_fetch = now.add(hours=self.post_cycle)
         self.save()
 
-    def _save_notes(
+    async def _save_notes(
             self,
             since: pendulum.DateTime,
             download_dir: Path
@@ -229,7 +229,7 @@ class UserConfig(BaseModel):
 
         console.log(f'fetch notes from {since:%Y-%m-%d}\n')
         note_time_order = []
-        for note_info, params in self.page():
+        async for note_info, params in self.page():
             sticky = note_info.pop('sticky')
             if note := Note.get_or_none(id=note_info['id']):
                 if note.time < since:
@@ -244,7 +244,7 @@ class UserConfig(BaseModel):
                             "获取完毕")
                         break
 
-            note = Note.from_id(note_info['id'], params=params)
+            note = await Note.from_id(note_info['id'], params=params)
             if note.time < since:
                 console.log(
                     f'find note {note.id} before {since:%y-%m-%d} '
@@ -268,7 +268,8 @@ class UserConfig(BaseModel):
             console.log(
                 f"Downloading {len(medias)} files to {download_dir}..")
             console.print()
-            yield from medias
+            for media in medias:
+                yield media
         if note_time_order:
             console.log(f'{len(note_time_order)} notes fetched')
             assert sorted(note_time_order, reverse=True) == note_time_order
@@ -301,14 +302,14 @@ class Note(BaseModel):
     updated_at = DateTimeTZField(null=True)
 
     @classmethod
-    def from_id(cls, note_id, update=None, params='') -> Self:
+    async def from_id(cls, note_id, update=None, params='') -> Self:
         note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
         if not update and (note := cls.get_or_none(id=note_id)):
             date = note.updated_at or note.added_at
             if update is False or (pendulum.now() - date).in_hours() < 24:
                 return note
 
-        note_dict = get_note(note_id, params)
+        note_dict = await get_note(note_id, params)
         note_dict = {k: v for k, v in note_dict.items() if v != []}
         user: User = User.get_by_id(note_dict['user_id'])
         assert note_dict.pop('avatar') == user.avatar
@@ -419,10 +420,10 @@ class Artist(BaseModel):
         table_name = "artist"
 
     @classmethod
-    def from_id(cls, user_id: int) -> Self:
+    async def from_id(cls, user_id: int) -> Self:
         if user_id in cls._cache:
             return cls._cache[user_id]
-        user = User.from_id(user_id)
+        user = await User.from_id(user_id)
         user_dict = model_to_dict(user)
         user_dict['user_id'] = user_dict.pop('id')
         user_dict = {k: v for k, v in user_dict.items()

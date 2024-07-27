@@ -1,5 +1,4 @@
 import json
-import os
 import pickle
 import random
 import time
@@ -9,11 +8,7 @@ import requests
 from DrissionPage import ChromiumOptions, ChromiumPage
 
 from redbook import console
-from redbook.client.client_sync import GetXS
-
-NODE_PATH = Path(__file__).resolve().parent.parent
-NODE_PATH /= 'node_modules'
-os.environ['NODE_PATH'] = str(NODE_PATH)
+from redbook.client.client import GetXS
 
 
 def _get_session():
@@ -36,10 +31,10 @@ class Fetcher:
         self.visits = 0
         self._last_fetch = time.time()
 
-    def login(self):
+    async def login(self):
         while True:
-            r = self.get('https://edith.xiaohongshu.com',
-                         api='/api/sns/web/v2/user/me')
+            r = await self.get('https://edith.xiaohongshu.com',
+                               api='/api/sns/web/v2/user/me')
             js = r.json()
             if js.pop('success'):
                 return js["data"]["nickname"]
@@ -66,11 +61,11 @@ class Fetcher:
         self.sess.headers['Cookie'] = cookie_str
         return cookies
 
-    def get(self, url, api='') -> requests.Response:
+    async def get(self, url, api='') -> requests.Response:
         console.log(f'Getting {url}, {api}')
         self._pause()
         url += api
-        headers = self._get_xs(api) if api else None
+        headers = await self._get_xs(api) if api else None
         while True:
             try:
                 r = self.sess.get(url, headers=headers)
@@ -89,11 +84,11 @@ class Fetcher:
                 assert r.status_code != 503
                 return r
 
-    def post(self, url, api, data: dict):
+    async def post(self, url, api, data: dict):
         console.log(f'Posting {url}, {api}, {data}')
         self._pause()
         data = json.dumps(data, separators=(',', ':'))
-        headers = self._get_xs(api, data)
+        headers = await self._get_xs(api, data)
         url += api
         while True:
             try:
@@ -111,8 +106,8 @@ class Fetcher:
                 assert r.status_code != 503
                 return r
 
-    def _get_xs(self, api, data=''):
-        return self.xs_getter.get_header(api, data)
+    async def _get_xs(self, api, data=''):
+        return await self.xs_getter.get_header(api, data)
 
     def _pause(self):
         self.visits += 1
