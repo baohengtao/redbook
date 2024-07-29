@@ -145,14 +145,12 @@ class UserConfig(BaseModel):
             assert note.pop('nick_name') == self.user.nickname
             assert note.pop('nickname') == self.user.nickname
             assert note.pop('user_id') == self.user_id
-            xsec_token = note.pop('xsec_token')
-            params = f"?xsec_token={xsec_token}&xsec_source=pc_user"
 
             note['liked_count'] = int(note['liked_count'])
 
             assert 'id' not in note
             note['id'] = note.pop('note_id')
-            yield note, params
+            yield note
 
     def get_post_cycle(self) -> int:
         interval = pendulum.Duration(days=30)
@@ -229,7 +227,7 @@ class UserConfig(BaseModel):
 
         console.log(f'fetch notes from {since:%Y-%m-%d}\n')
         note_time_order = []
-        async for note_info, params in self.page():
+        async for note_info in self.page():
             sticky = note_info.pop('sticky')
             if note := Note.get_or_none(id=note_info['id']):
                 if note.time < since:
@@ -244,7 +242,8 @@ class UserConfig(BaseModel):
                             "获取完毕")
                         break
 
-            note = await Note.from_id(note_info['id'], params=params)
+            note = await Note.from_id(note_info['id'],
+                                      xsec_token=note_info['xsec_token'])
             if note.time < since:
                 console.log(
                     f'find note {note.id} before {since:%y-%m-%d} '
@@ -300,16 +299,18 @@ class Note(BaseModel):
     video = TextField(null=True)
     added_at = DateTimeTZField(null=True)
     updated_at = DateTimeTZField(null=True)
+    xsec_token = TextField(null=True)
 
     @classmethod
-    async def from_id(cls, note_id, update=None, params='') -> Self:
+    async def from_id(cls, note_id, update=None, xsec_token=None) -> Self:
         note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
         if not update and (note := cls.get_or_none(id=note_id)):
             date = note.updated_at or note.added_at
             if update is False or (pendulum.now() - date).in_hours() < 24:
                 return note
-
-        note_dict = await get_note(note_id, params)
+        if note:
+            xsec_token = note.xsec_token
+        note_dict = await get_note(note_id, xsec_token)
         note_dict = {k: v for k, v in note_dict.items() if v != []}
         user: User = User.get_by_id(note_dict['user_id'])
         assert note_dict.pop('avatar') == user.avatar
@@ -347,10 +348,12 @@ class Note(BaseModel):
 
     def medias(self, filepath: Path = None) -> Iterator[dict]:
         prefix = f'{self.last_update_time:%y-%m-%d}_{self.username}_{self.id}'
-        for sn, url in enumerate(self.pics, start=1):
+        for sn, pic_id in enumerate(self.pic_ids, start=1):
+            url = (f'http://sns-img-hw.xhscdn.com/{pic_id}?imageView2/2/w/1000000000'
+                   '/format/webp/q/75%7CimageMogr2/strip&redImage/frame/0')
             yield {
-                'url': url.split('⭐️')[0],
-                'filename': f'{prefix}_{sn}.jpg',
+                'url': url,
+                'filename': f'{prefix}_{sn}.webp',
                 'filepath': filepath,
                 'xmp_info': self.gen_meta(sn=sn, url=url),
             }
@@ -420,10 +423,10 @@ class Artist(BaseModel):
         table_name = "artist"
 
     @classmethod
-    async def from_id(cls, user_id: int) -> Self:
+    def from_id(cls, user_id: int) -> Self:
         if user_id in cls._cache:
             return cls._cache[user_id]
-        user = await User.from_id(user_id)
+        user = User.get_by_id(user_id)
         user_dict = model_to_dict(user)
         user_dict['user_id'] = user_dict.pop('id')
         user_dict = {k: v for k, v in user_dict.items()

@@ -5,6 +5,7 @@ from typing import Iterator
 
 import pendulum
 from camel_converter import dict_to_snake
+from furl import furl
 
 from redbook import console
 from redbook.fetcher import fetcher
@@ -145,7 +146,7 @@ async def get_user_notes(user_id: str) -> Iterator[dict]:
         assert cursor
 
 
-async def get_note(note_id, params: str = '', parse=True):
+async def get_note_from_web(note_id, params: str = '', parse=True):
     note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
     r = await fetcher.get(f'https://www.xiaohongshu.com/explore/{note_id}{params}')
     info = re.findall(
@@ -157,13 +158,45 @@ async def get_note(note_id, params: str = '', parse=True):
     note = dict_to_snake(note)
     note['url'] = f'https://www.xiaohongshu.com/explore/{note_id}'
     try:
-        return _parse_note(note) if parse else note
+        return parse_note(note) if parse else note
     except AssertionError:
         console.log(note['url'], style='error')
         raise
 
 
-def _parse_note(note):
+async def get_note(note_id, xsec_token=None, parse=True):
+    if note_id.startswith('https://www.xiaohongshu.com/explore/'):
+        url = furl(note_id)
+        note_id = url.path.segments[-1]
+        xsec_token = url.args.get('xsec_token')
+    assert xsec_token
+    note_data = {'source_note_id': note_id,
+                 'image_formats': ['jpg', 'webp', 'avif'],
+                 'extra': {'need_body_topic': 1},
+                 'xsec_token': xsec_token
+                 }
+    r = await fetcher.post('https://edith.xiaohongshu.com',
+                           '/api/sns/web/v1/feed', note_data)
+    js = r.json()
+    data = js.pop('data')
+    assert js == {'code': 0, 'success': True, 'msg': '成功'}
+    items = data.pop('items')
+    assert len(items) == 1
+    item = items[0]
+    note = item.pop('note_card')
+    assert 'url' not in note
+    assert 'xsec_token' not in note
+    note['url'] = f'https://www.xiaohongshu.com/explore/{note_id}?xsec_token={xsec_token}'
+    note['xsec_token'] = xsec_token
+    assert item == {'id': note_id, 'model_type': 'note'}
+    try:
+        return parse_note(note) if parse else note
+    except AssertionError:
+        console.log(note['url'], style='error')
+        raise
+
+
+def parse_note(note):
     for key in ['user',  'share_info', 'interact_info']:
         value = note.pop(key)
         assert note | value == value | note
