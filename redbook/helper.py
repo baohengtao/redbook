@@ -46,7 +46,7 @@ def convert_js_dict_to_py(js_dict: str) -> dict:
 
 
 async def download_files(imgs: AsyncIterable[dict]):
-    with ThreadPoolExecutor(max_workers=20) as pool:
+    with ThreadPoolExecutor(max_workers=10) as pool:
         futures = [pool.submit(download_single_file, **img) async for img in imgs]
     for future in futures:
         future.result()

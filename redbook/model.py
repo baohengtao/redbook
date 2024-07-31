@@ -187,7 +187,7 @@ class UserConfig(BaseModel):
         if self.note_fetch_at:
             since = pendulum.instance(self.note_fetch_at)
         else:
-            await Artist.from_id(self.user_id)
+            Artist.from_id(self.user_id)
             since = pendulum.from_timestamp(0)
         if self.note_fetch_at:
             estimated_post = since.diff().in_hours() / self.post_cycle

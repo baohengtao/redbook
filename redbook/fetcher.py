@@ -11,20 +11,8 @@ from redbook import console
 from redbook.client.client import GetXS
 
 
-def _get_session():
-    sess = requests.Session()
-    sess.headers = {
-        "content-type": "application/json;charset=UTF-8",
-        "origin": "https://www.xiaohongshu.com",
-        "referer": "https://www.xiaohongshu.com/",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188",
-    }
-    return sess
-
-
 class Fetcher:
     def __init__(self) -> None:
-        self.sess = _get_session()
         self.cookies = self.load_cookie()
         self.xs_getter = GetXS(self.cookies)
         self._visit_count = 0
@@ -56,19 +44,16 @@ class Fetcher:
             browser.quit()
             cookie_file = Path(__file__).with_name('cookie.pkl')
             cookie_file.write_bytes(pickle.dumps(cookies))
-        cookie_str = ';'.join(
-            f"{cookie['name']}={cookie['value']}" for cookie in cookies)
-        self.sess.headers['Cookie'] = cookie_str
         return cookies
 
     async def get(self, url, api='') -> requests.Response:
         console.log(f'Getting {url}, {api}')
         self._pause()
         url += api
-        headers = await self._get_xs(api) if api else None
+        headers = await self._get_xs(api)
         while True:
             try:
-                r = self.sess.get(url, headers=headers)
+                r = requests.get(url, headers=headers)
                 r.raise_for_status()
             except (requests.exceptions.ConnectionError,
                     requests.exceptions.HTTPError,
@@ -91,7 +76,7 @@ class Fetcher:
         url += api
         while True:
             try:
-                r = self.sess.post(url, headers=headers, data=data)
+                r = requests.post(url, headers=headers, data=data)
                 r.raise_for_status()
             except (requests.exceptions.ConnectionError,
                     requests.exceptions.HTTPError,
