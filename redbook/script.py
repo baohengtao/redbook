@@ -87,11 +87,12 @@ async def user_loop(frequency: float = 2,
         if configs := query.where(UserConfig.note_fetch_at.is_null(True)):
             console.log(
                 f'total {configs.count()} new users found, fetching...')
+            limit = len(configs)
         elif configs := query.where(UserConfig.note_next_fetch < pendulum.now()):
             console.log(
                 f' {len(configs)} users satisfy fetching conditions, '
                 'Fetching 10 users whose estimated new notes is most')
-            configs = configs[:10]
+            limit = 10
         else:
             configs = query.order_by(UserConfig.note_fetch_at)
             if configs[0].note_fetch_at < pendulum.now().subtract(days=15):
@@ -101,11 +102,12 @@ async def user_loop(frequency: float = 2,
             console.log(
                 'no user satisfy fetching conditions, '
                 f'fetching {limit} users whose note_fetch_at is earliest.')
-            configs = configs[:limit]
-        for i, config in enumerate(configs):
+        for i, config in enumerate(configs[:limit]):
             if start_time.diff().in_minutes() > WORKING_TIME:
                 break
-            console.log(f'fetching {i+1}/{len(configs)}: {config.username}')
+            console.log(
+                f'fetching {i+1}/{limit}: {config.username} '
+                f'(total: {len(configs)})')
             config = await UserConfig.from_id(user_id=config.user_id)
             is_new = config.note_fetch_at is None
             await config.fetch_note(download_dir)
