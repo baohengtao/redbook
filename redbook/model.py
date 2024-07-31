@@ -28,7 +28,7 @@ class BaseModel(Model):
     class Meta:
         database = database
 
-    def __str__(self):
+    def __repr__(self):
         model = model_to_dict(self, recurse=False)
         for k, v in model.items():
             if isinstance(v, datetime):
@@ -69,6 +69,9 @@ class User(BaseModel):
     added_at = DateTimeTZField(null=True, default=pendulum.now)
     redirect = TextField(null=True)
     search_results = GirlSearch.get_search_results()['red']
+
+    def __str__(slef):
+        return super().__repr__()
 
     @classmethod
     async def from_id(cls, user_id: str, update=False) -> Self:
@@ -125,6 +128,9 @@ class UserConfig(BaseModel):
     photos_num = IntegerField(null=True)
     folder = CharField(null=True)
     added_at = DateTimeTZField(null=True, default=pendulum.now)
+
+    def __str__(slef):
+        return super().__repr__()
 
     @classmethod
     async def from_id(cls, user_id: int) -> Self:
@@ -398,6 +404,9 @@ class Note(BaseModel):
         model.pop('pic_ids')
         return "\n".join(f'{k}: {v}' for k, v in model.items())
 
+    def __repr__(slef):
+        return super().__repr__()
+
 
 class Artist(BaseModel):
     user = ForeignKeyField(User, unique=True, backref='artist')
@@ -421,6 +430,9 @@ class Artist(BaseModel):
 
     class Meta:
         table_name = "artist"
+
+    def __str__(slef):
+        return super().__repr__()
 
     @classmethod
     def from_id(cls, user_id: int) -> Self:
