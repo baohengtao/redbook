@@ -350,9 +350,9 @@ class Note(BaseModel):
         prefix = f'{self.last_update_time:%y-%m-%d}_{self.username}_{self.id}'
         for sn, pic_id in enumerate(self.pic_ids, start=1):
             url = (f'http://sns-img-hw.xhscdn.com/{pic_id}?imageView2/2/w/1000000000'
-                   '/format/webp/q/75%7CimageMogr2/strip&redImage/frame/0')
+                   '/format/jpg')
             yield {
-                'url': url,
+                'url': url.split('?')[0],
                 'filename': f'{prefix}_{sn}.webp',
                 'filepath': filepath,
                 'xmp_info': self.gen_meta(sn=sn, url=url),

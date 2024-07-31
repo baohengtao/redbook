@@ -1,6 +1,7 @@
 import itertools
 import re
 import time
+from copy import deepcopy
 from typing import Iterator
 
 import pendulum
@@ -197,6 +198,7 @@ async def get_note(note_id, xsec_token=None, parse=True):
 
 
 def parse_note(note):
+    note = deepcopy(note)
     for key in ['user',  'share_info', 'interact_info']:
         value = note.pop(key)
         assert note | value == value | note
@@ -245,28 +247,30 @@ def parse_note(note):
     assert len(at_user) == len(at_user_list)
     note['at_user'] = at_user
 
-    pics = []
+    pics, pic_ids = [], []
     for image in note.pop('image_list'):
         image = {k: v for k, v in image.items() if (v is False or v) and k not in [
             'height', 'width']}
         info_list = image.pop('info_list')
         assert all(len(i) == 2 for i in info_list)
         info_list = {i['image_scene']: i['url'] for i in info_list}
-        pic = image.pop('url_default')
-        assert pic == info_list.pop('WB_DFT')
-        assert image.pop('url_pre') == info_list.pop('WB_PRV')
+        assert (pic := image.pop('url_default')) == info_list.pop('WB_DFT')
+        assert (pic_pre := image.pop('url_pre')) == info_list.pop('WB_PRV')
         assert not info_list
+        pic_id = pic.split('/')[-1].split('!')[0]
+        pic_id_pre = pic_pre.split('/')[-1].split('!')[0]
+        assert pic_id == pic_id_pre
+        pic = f'http://sns-img-hw.xhscdn.com/{pic_id}?imageView2/2/w/1000000/format/jpg'
         if image.pop('live_photo') is True:
             stream = {k: v for k, v in image.pop('stream').items() if v}
             assert len(stream) == 1
-            pic += '⭐️'+stream.pop('h264')[0]['master_url']
+            pic += ' '+stream.pop('h264')[0]['master_url']
         assert not image
-
+        pic_ids.append(pic_id)
         pics.append(pic)
     assert 'pics' not in note
     note['pics'] = pics
-    note['pic_ids'] = [pic.split('⭐️')[0].split(
-        '/')[-1].split('!')[0] for pic in pics]
+    note['pic_ids'] = pic_ids
 
     if 'video' in note:
         stream = note.pop('video').pop('media').pop('stream')
