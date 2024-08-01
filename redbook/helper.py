@@ -1,13 +1,12 @@
+import asyncio
 import json
 import sys
-import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import AsyncIterable
 
 import execjs
+import httpx
 import pendulum
-import requests
 from exiftool import ExifToolHelper
 
 from redbook import console
@@ -15,6 +14,9 @@ from redbook import console
 if not (d := Path('/Volumes/Art')).exists():
     d = Path.home()/'Pictures'
 default_path = d / 'RedBook'
+semaphore = asyncio.Semaphore(1e7)
+client = httpx.AsyncClient()
+et = ExifToolHelper()
 
 
 def normalize_user_id(user_id: str) -> str:
@@ -46,13 +48,11 @@ def convert_js_dict_to_py(js_dict: str) -> dict:
 
 
 async def download_files(imgs: AsyncIterable[dict]):
-    with ThreadPoolExecutor(max_workers=10) as pool:
-        futures = [pool.submit(download_single_file, **img) async for img in imgs]
-    for future in futures:
-        future.result()
+    tasks = [asyncio.create_task(download_single_file(**img)) async for img in imgs]
+    await asyncio.gather(*tasks)
 
 
-def download_single_file(
+async def download_single_file(
         url: str,
         filepath: Path,
         filename: str,
@@ -69,13 +69,14 @@ def download_single_file(
         console.log(f'downloading {img}...', style="dim")
     while True:
         try:
-            r = requests.get(url, headers=headers)
-        except requests.exceptions.ConnectionError as e:
+            async with semaphore:
+                r = await client.get(url, headers=headers)
+        except httpx.HTTPError as e:
             period = 60
             console.log(
                 f"{e}: Sleepping {period} seconds and "
                 f"retry [link={url}]{url}[/link]...", style='error')
-            time.sleep(period)
+            await asyncio.sleep(period)
             continue
 
         if r.status_code == 404:
@@ -84,7 +85,7 @@ def download_single_file(
             return
         elif r.status_code != 200:
             console.log(f"{url}, {r.status_code}", style="error")
-            time.sleep(15)
+            await asyncio.sleep(15)
             console.log(f'retrying download for {url}...')
             continue
 
@@ -107,16 +108,15 @@ def write_xmp(img: Path, tags: dict):
         if isinstance(v, str):
             tags[k] = v.replace('\n', '&#x0a;')
     params = ['-overwrite_original', '-ignoreMinorErrors', '-escapeHTML']
-    with ExifToolHelper() as et:
-        ext = et.get_tags(img, 'File:FileTypeExtension')[
-            0]['File:FileTypeExtension'].lower()
-        if (suffix := f'.{ext}') != img.suffix:
-            new_img = img.with_suffix(suffix)
-            console.log(
-                f'{img}: suffix is not right, moving to {new_img}...',
-                style='error')
-            img = img.rename(new_img)
-        et.set_tags(img, tags, params=params)
+    ext = et.get_tags(img, 'File:FileTypeExtension')[
+        0]['File:FileTypeExtension'].lower()
+    if (suffix := f'.{ext}') != img.suffix:
+        new_img = img.with_suffix(suffix)
+        console.log(
+            f'{img}: suffix is not right, moving to {new_img}...',
+            style='error')
+        img = img.rename(new_img)
+    et.set_tags(img, tags, params=params)
 
 
 def logsaver_decorator(func):

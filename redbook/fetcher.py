@@ -1,14 +1,16 @@
+import asyncio
 import json
 import pickle
 import random
 import time
 from pathlib import Path
 
-import requests
 from DrissionPage import ChromiumOptions, ChromiumPage
+from httpx import HTTPError, Response
 
 from redbook import console
 from redbook.client.client import GetXS
+from redbook.helper import client
 
 
 class Fetcher:
@@ -46,18 +48,16 @@ class Fetcher:
             cookie_file.write_bytes(pickle.dumps(cookies))
         return cookies
 
-    async def get(self, url, api='') -> requests.Response:
+    async def get(self, url, api='') -> Response:
         console.log(f'Getting {url}, {api}')
-        self._pause()
+        await self._pause()
         url += api
         headers = await self._get_xs(api)
         while True:
             try:
-                r = requests.get(url, headers=headers)
+                r = await client.get(url, headers=headers)
                 r.raise_for_status()
-            except (requests.exceptions.ConnectionError,
-                    requests.exceptions.HTTPError,
-                    requests.exceptions.ProxyError) as e:
+            except HTTPError as e:
                 if r.status_code == 461:
                     raise
                 period = 60
@@ -69,18 +69,16 @@ class Fetcher:
                 assert r.status_code != 503
                 return r
 
-    async def post(self, url, api, data: dict):
-        self._pause()
+    async def post(self, url, api, data: dict) -> Response:
+        await self._pause()
         headers = await self._get_xs(api, data)
         data = json.dumps(data, separators=(',', ':'))
         url += api
         while True:
             try:
-                r = requests.post(url, headers=headers, data=data)
+                r = await client.post(url, headers=headers, data=data)
                 r.raise_for_status()
-            except (requests.exceptions.ConnectionError,
-                    requests.exceptions.HTTPError,
-                    requests.exceptions.ProxyError) as e:
+            except HTTPError as e:
                 period = 60
                 console.log(
                     f"{e}: Sleeping {period} seconds and "
@@ -93,7 +91,7 @@ class Fetcher:
     async def _get_xs(self, api, data=''):
         return await self.xs_getter.get_header(api, data)
 
-    def _pause(self):
+    async def _pause(self):
         self.visits += 1
         if self._visit_count == 0:
             self._visit_count = 1
@@ -110,7 +108,7 @@ class Fetcher:
             sleep_time = 4
         else:
             sleep_time = 1
-        sleep_time *= random.uniform(0.5, 1.5) * 4
+        sleep_time *= random.uniform(0.5, 1.5) * 2
         self._last_fetch += sleep_time
         if (wait_time := (self._last_fetch-time.time())) > 0:
             console.log(
@@ -128,7 +126,7 @@ class Fetcher:
                 f'no sleeping since more than {sleep_time:.1f} seconds passed'
                 f'(count: {self._visit_count})')
         while time.time() < self._last_fetch:
-            time.sleep(0.1)
+            await asyncio.sleep(0.1)
         self._last_fetch = time.time()
         self._visit_count += 1
 

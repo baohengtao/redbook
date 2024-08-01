@@ -264,7 +264,7 @@ class UserConfig(BaseModel):
                             f"{[note.title, note.desc]}", style='error')
             for k, v in note_info.items():
                 if getattr(note, k) != v:
-                    assert k == 'liked_count'
+                    assert k in ['liked_count', 'xsec_token']
             if not sticky:
                 note_time_order.append(note.time)
 
