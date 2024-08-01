@@ -62,11 +62,17 @@ async def download_single_file(
     img = filepath / filename
     headers = {
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188", }
-    if img.exists():
-        console.log(f'{img} already exists..skipping...', style='info')
-        return
+    if img.suffix == '.webp':
+        suffixs = ['.webp', '.jpg', '.heic']
     else:
-        console.log(f'downloading {img}...', style="dim")
+        assert img.suffix == '.mp4'
+        suffixs = ['.mp4']
+    for suffix in suffixs:
+        if (i := img.with_suffix(suffix)).exists():
+            console.log(f'{i} already exists..skipping...', style='info')
+            return
+
+    console.log(f'downloading {img}...', style="dim")
     while True:
         try:
             async with semaphore:
