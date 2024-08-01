@@ -197,6 +197,15 @@ async def get_note(note_id, xsec_token=None, parse=True):
         raise
 
 
+def parse_video_url(url):
+    url = furl(url)
+    if url.query:
+        assert url.host == 'sns-video-qc.xhscdn.com'
+        url.query = None
+    url.host = 'sns-video-bd.xhscdn.com'
+    return str(url)
+
+
 def parse_note(note):
     note = deepcopy(note)
     for key in ['user',  'share_info', 'interact_info']:
@@ -264,7 +273,8 @@ def parse_note(note):
         if image.pop('live_photo') is True:
             stream = {k: v for k, v in image.pop('stream').items() if v}
             assert len(stream) == 1
-            pic += ' '+stream.pop('h264')[0]['master_url']
+            video_url = stream.pop('h264')[0]['master_url']
+            pic += ' ' + parse_video_url(video_url)
         assert not image
         pic_ids.append(pic_id)
         pics.append(pic)
@@ -281,8 +291,7 @@ def parse_note(note):
         assert key in ['h264', 'h265']
         assert not stream
         assert len(h264) == 1
-        h264 = h264[0]
-        note['video'] = h264['master_url']
+        note['video'] = parse_video_url(h264[0]['master_url'])
 
     for k in note:
         if isinstance(note[k], str):

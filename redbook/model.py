@@ -343,9 +343,7 @@ class Note(BaseModel):
             assert value or value == 0
             if (ori := model_dict[key]) == value:
                 continue
-            if key == 'pics':
-                continue
-            if key in ['pic_ids', 'video', 'video_md5']:
+            if key in ['pic_ids', 'pics', 'video', 'video_md5']:
                 assert note_dict['last_update_time'] > model.last_update_time
             console.log(f'+{key}: {value}', style='green bold on dark_green')
             if ori is not None:
