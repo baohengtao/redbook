@@ -155,9 +155,10 @@ async def user_loop(frequency: float = 2,
 async def user(download_dir: Path = default_path):
     """Add user to database of users whom we want to fetch from"""
     UserConfig.update_table()
-    config = UserConfig.select().order_by(UserConfig.id.desc()).first()
-    user = config.user
-    console.log(f'total {UserConfig.select().count()} users in database')
+    query = UserConfig.select().where(
+        UserConfig.following).order_by(UserConfig.id.desc())
+    user = query[0].user
+    console.log(f'total {query.count()} users in database')
     console.log(
         f'the latest added user is {user.username} ({user.id, user.nickname})')
 
