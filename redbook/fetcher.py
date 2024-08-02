@@ -48,17 +48,15 @@ class Fetcher:
             cookie_file.write_bytes(pickle.dumps(cookies))
         return cookies
 
-    async def get(self, url, api='') -> Response:
-        console.log(f'Getting {url}, {api}')
+    async def request(self, method, url, **kwargs) -> Response:
+        console.log(f'{method} {url}')
         await self._pause()
-        url += api
-        headers = await self._get_xs(api)
         while True:
             try:
-                r = await client.get(url, headers=headers)
+                r = await client.request(method, url, **kwargs)
                 r.raise_for_status()
             except asyncio.CancelledError:
-                console.log(f'{url+api}  was cancelled.', style='error')
+                console.log(f'{method} {url}  was cancelled.', style='error')
                 raise KeyboardInterrupt
             except HTTPError as e:
                 if r.status_code == 461:
@@ -67,32 +65,20 @@ class Fetcher:
                 console.log(
                     f"{e}: Sleeping {period} seconds and "
                     f"retry [link={url}]{url}[/link]...", style='error')
-                time.sleep(period)
+                asyncio.sleep(period)
             else:
-                assert r.status_code != 503
                 return r
 
+    async def get(self, url, api='') -> Response:
+        url += api
+        headers = await self._get_xs(api)
+        return await self.request('Get', url, headers=headers)
+
     async def post(self, url, api, data: dict) -> Response:
-        await self._pause()
         headers = await self._get_xs(api, data)
         data = json.dumps(data, separators=(',', ':'))
         url += api
-        while True:
-            try:
-                r = await client.post(url, headers=headers, data=data)
-                r.raise_for_status()
-            except asyncio.CancelledError:
-                console.log(f'{url+api} was cancelled.', style='error')
-                raise KeyboardInterrupt
-            except HTTPError as e:
-                period = 60
-                console.log(
-                    f"{e}: Sleeping {period} seconds and "
-                    f"retry [link={url}]{url}[/link]...", style='error')
-                time.sleep(period)
-            else:
-                assert r.status_code != 503
-                return r
+        return await self.request('Post', url, headers=headers, data=data)
 
     async def _get_xs(self, api, data=''):
         return await self.xs_getter.get_header(api, data)
