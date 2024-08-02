@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Self
+from typing import AsyncIterator, Iterator, Self
 
 import pendulum
 from peewee import Model
@@ -145,7 +145,7 @@ class UserConfig(BaseModel):
             cls.insert(to_insert).execute()
         return cls.get(user_id=user_id)
 
-    async def page(self) -> Iterator[tuple[dict, str]]:
+    async def page(self) -> AsyncIterator[tuple[dict, str]]:
         async for note in get_user_notes(self.user_id):
             assert note.pop('avatar') == self.user.avatar
             assert note.pop('nick_name') == self.user.nickname
@@ -214,7 +214,7 @@ class UserConfig(BaseModel):
             self,
             since: pendulum.DateTime,
             download_dir: Path
-    ) -> Iterator[dict]:
+    ) -> AsyncIterator[dict]:
         """
         Save weibo to database and return media info
         :return: generator of medias to downloads

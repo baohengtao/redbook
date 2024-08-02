@@ -57,6 +57,9 @@ class Fetcher:
             try:
                 r = await client.get(url, headers=headers)
                 r.raise_for_status()
+            except asyncio.CancelledError:
+                console.log(f'{url+api}  was cancelled.', style='error')
+                raise KeyboardInterrupt
             except HTTPError as e:
                 if r.status_code == 461:
                     raise
@@ -78,6 +81,9 @@ class Fetcher:
             try:
                 r = await client.post(url, headers=headers, data=data)
                 r.raise_for_status()
+            except asyncio.CancelledError:
+                console.log(f'{url+api} was cancelled.', style='error')
+                raise KeyboardInterrupt
             except HTTPError as e:
                 period = 60
                 console.log(
@@ -126,7 +132,11 @@ class Fetcher:
                 f'no sleeping since more than {sleep_time:.1f} seconds passed'
                 f'(count: {self._visit_count})')
         while time.time() < self._last_fetch:
-            await asyncio.sleep(0.1)
+            try:
+                await asyncio.sleep(0.1)
+            except asyncio.CancelledError:
+                console.log('Cancelled on sleep', style='error')
+                raise KeyboardInterrupt
         self._last_fetch = time.time()
         self._visit_count += 1
 
