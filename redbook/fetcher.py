@@ -59,13 +59,11 @@ class Fetcher:
                 console.log(f'{method} {url}  was cancelled.', style='error')
                 raise KeyboardInterrupt
             except HTTPError as e:
-                if r.status_code == 461:
-                    raise
                 period = 60
                 console.log(
                     f"{e}: Sleeping {period} seconds and "
                     f"retry [link={url}]{url}[/link]...", style='error')
-                asyncio.sleep(period)
+                await asyncio.sleep(period)
             else:
                 return r
 
