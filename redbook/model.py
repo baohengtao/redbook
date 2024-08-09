@@ -186,21 +186,17 @@ class UserConfig(BaseModel):
             return
         if self.note_fetch_at:
             since = pendulum.instance(self.note_fetch_at)
-        else:
-            Artist.from_id(self.user_id)
-            since = pendulum.from_timestamp(0)
-        if self.note_fetch_at:
             estimated_post = since.diff().in_hours() / self.post_cycle
             estimated_post = f'estimated_new_posts:{estimated_post:.2f}'
             msg = f' (fetch_at:{since:%y-%m-%d} {estimated_post})'
         else:
-            msg = ''
+            msg = '(New User)'
         console.rule(f"开始获取 {self.username} 的主页 {msg}")
         console.log(self.user)
         console.log(f"Media Saving: {download_dir}")
 
         now = pendulum.now()
-        imgs = self._save_notes(since, download_dir)
+        imgs = self._save_notes(download_dir)
         await download_files(imgs)
         console.log(f"{self.username} 📕 获取完毕\n")
 
@@ -212,7 +208,6 @@ class UserConfig(BaseModel):
 
     async def _save_notes(
             self,
-            since: pendulum.DateTime,
             download_dir: Path
     ) -> AsyncIterator[dict]:
         """
@@ -220,15 +215,8 @@ class UserConfig(BaseModel):
         :return: generator of medias to downloads
         """
 
-        if since < pendulum.now().subtract(years=1):
-            user_root = 'New'
-        elif not self.photos_num:
-            console.log(
-                f'seems {self.username} not processed, using New folder',
-                style='green on dark_green')
-            user_root = 'New'
-        else:
-            user_root = 'User'
+        since = self.note_fetch_at or pendulum.from_timestamp(0)
+        user_root = 'User' if self.note_fetch_at and self.photos_num else 'New'
         download_dir = download_dir / user_root / self.username
 
         console.log(f'fetch notes from {since:%Y-%m-%d}\n')
