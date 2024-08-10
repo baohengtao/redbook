@@ -18,7 +18,7 @@ from playhouse.postgres_ext import (
 from playhouse.shortcuts import model_to_dict
 
 from redbook import console
-from redbook.helper import download_files
+from redbook.helper import download_files, normalize_count
 from redbook.redbook import get_note, get_user, get_user_notes
 
 database = PostgresqlExtDatabase("redbook", host="localhost")
@@ -152,7 +152,7 @@ class UserConfig(BaseModel):
             assert note.pop('nickname') == self.user.nickname
             assert note.pop('user_id') == self.user_id
 
-            note['liked_count'] = int(note['liked_count'])
+            note['liked_count'] = normalize_count(note['liked_count'])
 
             assert 'id' not in note
             note['id'] = note.pop('note_id')

@@ -10,7 +10,7 @@ from furl import furl
 
 from redbook import console
 from redbook.fetcher import fetcher
-from redbook.helper import convert_js_dict_to_py
+from redbook.helper import convert_js_dict_to_py, normalize_count
 
 
 async def get_user(user_id: str, parse: bool = True) -> dict:
@@ -216,7 +216,7 @@ def parse_note(note):
 
     for k in note:
         if 'count' in k:
-            note[k] = int(note[k])
+            note[k] = normalize_count(note[k])
 
     assert note.pop('un_share') is False
     assert 'id' not in note

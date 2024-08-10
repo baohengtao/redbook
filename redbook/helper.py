@@ -163,3 +163,18 @@ def save_log(func_name, download_dir):
     log_file = f"{func_name}_{time_format}.html"
     console.log(f'Saving log to {download_dir / log_file}')
     console.save_html(download_dir / log_file, theme=MONOKAI)
+
+
+def normalize_count(amount):
+    if amount and isinstance(amount, str):
+        num, mul = amount[:-1], amount[-1]
+        match mul:
+            case '亿':
+                amount = float(num) * (10 ** 8)
+            case '万':
+                amount = float(num) * (10 ** 4)
+            case _:
+                if amount.isnumeric():
+                    amount = int(amount)
+
+    return amount
