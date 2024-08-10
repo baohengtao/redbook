@@ -215,8 +215,13 @@ class UserConfig(BaseModel):
         :return: generator of medias to downloads
         """
 
-        since = self.note_fetch_at or pendulum.from_timestamp(0)
-        user_root = 'User' if self.note_fetch_at and self.photos_num else 'New'
+        since = pendulum.instance(
+            self.note_fetch_at or pendulum.from_timestamp(0))
+        user_root = 'User' if (
+            self.note_fetch_at and self.photos_num) else 'NewInit'
+        if user_root == 'NewInit' and self.note_fetch_at:
+            if not (download_dir / user_root / self.username).exists():
+                user_root = 'New'
         download_dir = download_dir / user_root / self.username
 
         console.log(f'fetch notes from {since:%Y-%m-%d}\n')

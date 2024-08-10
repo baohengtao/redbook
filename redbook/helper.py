@@ -123,7 +123,7 @@ def write_xmp(img: Path, tags: dict):
         new_img = img.with_suffix(suffix)
         console.log(
             f'{img}: suffix is not right, moving to {new_img}...',
-            style='error')
+            style='info')
         img = img.rename(new_img)
     et.set_tags(img, tags, params=params)
 
