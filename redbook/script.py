@@ -196,7 +196,7 @@ def write_meta(download_dir: Path = default_path):
 
 
 @app.command()
-def database_clean():
+def clean_database():
     for u in User:
         if (u.artist and u.artist[0].photos_num) or u.config:
             continue

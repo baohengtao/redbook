@@ -49,7 +49,6 @@ class Fetcher:
         return cookies
 
     async def request(self, method, url, **kwargs) -> Response:
-        console.log(f'{method} {url}')
         await self._pause()
         while True:
             try:
@@ -57,7 +56,7 @@ class Fetcher:
                 r.raise_for_status()
             except asyncio.CancelledError:
                 console.log(f'{method} {url}  was cancelled.', style='error')
-                raise KeyboardInterrupt
+                raise
             except HTTPError as e:
                 period = 60
                 console.log(

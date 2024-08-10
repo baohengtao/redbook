@@ -5,3 +5,4 @@ __pycache__
 cookie.pkl
 *.ipynb
 browser_data
+MediaCrawler

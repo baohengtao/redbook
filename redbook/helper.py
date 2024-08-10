@@ -86,7 +86,7 @@ async def download_single_file(
             continue
         except asyncio.CancelledError:
             console.log(f'{url} was cancelled.', style='info')
-            raise KeyboardInterrupt
+            raise
 
         if r.status_code == 404:
             console.log(
