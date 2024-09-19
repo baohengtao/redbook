@@ -88,7 +88,9 @@ async def user_loop(frequency: float = 2,
             console.log(
                 f'total {configs.count()} new users found, fetching...')
             limit = len(configs)
-        elif configs := query.where(UserConfig.note_next_fetch < pendulum.now()):
+        elif ((configs := query.where(
+                UserConfig.note_next_fetch < pendulum.now()))
+                and (len(configs) >= 5)):
             console.log(
                 f' {len(configs)} users satisfy fetching conditions, '
                 'Fetching 10 users whose estimated new notes is most')

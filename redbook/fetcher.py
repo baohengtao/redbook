@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import pickle
 import random
 import time
@@ -11,6 +12,9 @@ from httpx import HTTPError, Response
 from redbook import console
 from redbook.client.client import GetXS
 from redbook.helper import client
+
+httpx_logger = logging.getLogger("httpx")
+httpx_logger.disabled = True
 
 
 class Fetcher:
@@ -49,22 +53,25 @@ class Fetcher:
         return cookies
 
     async def request(self, method, url, **kwargs) -> Response:
-        await self._pause()
-        while True:
+        for try_time in range(1, 100):
             try:
+                await self._pause()
                 r = await client.request(method, url, **kwargs)
                 r.raise_for_status()
             except asyncio.CancelledError:
                 console.log(f'{method} {url}  was cancelled.', style='error')
                 raise
             except HTTPError as e:
-                period = 60
+                period = 30 * ((try_time % 10) or 30)
                 console.log(
-                    f"{e}: Sleeping {period} seconds and "
-                    f"retry [link={url}]{url}[/link]...", style='error')
+                    f"{e!r}: failed on {try_time}th trys, sleeping {period} "
+                    f"seconds and retry [link={url}]{url}[/link]...",
+                    style='info')
                 await asyncio.sleep(period)
             else:
                 return r
+        else:
+            raise ConnectionError('request failed')
 
     async def get(self, url, api='') -> Response:
         url += api
@@ -87,17 +94,15 @@ class Fetcher:
             self._last_fetch = time.time()
             return
 
-        if self._visit_count % 256 == 0:
-            sleep_time = 256
-        elif self._visit_count % 64 == 0:
+        if self._visit_count % 64 == 0:
             sleep_time = 64
         elif self._visit_count % 16 == 0:
             sleep_time = 16
         elif self._visit_count % 4 == 0:
             sleep_time = 4
         else:
-            sleep_time = 1
-        sleep_time *= random.uniform(0.5, 1.5) * 2
+            sleep_time = 2
+        sleep_time *= random.uniform(0.9, 1.1) * 5
         self._last_fetch += sleep_time
         if (wait_time := (self._last_fetch-time.time())) > 0:
             console.log(
