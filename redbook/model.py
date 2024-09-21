@@ -345,22 +345,33 @@ class Note(BaseModel):
 
     def medias(self, filepath: Path = None) -> Iterator[dict]:
         prefix = f'{self.last_update_time:%y-%m-%d}_{self.username}_{self.id}'
-        for sn, pic_id in enumerate(self.pic_ids, start=1):
-            url = (f'http://sns-img-hw.xhscdn.com/{pic_id}?imageView2/2/w/1000000000'
-                   '/format/jpg')
-            yield {
-                'url': url.split('?')[0],
-                'filename': f'{prefix}_{sn}.webp',
+        for sn, url in enumerate(self.pics, start=1):
+            if ' ' not in url:
+                url += ' '
+            url, live = url.split(' ')
+            live_tag = '_live' if live else ''
+            suffix = '.heic' if live else '.webp'
+            meta = [{
+                'url': url.split('?')[0] if not live else url.replace('/format/jpg', '/format/heif'),
+                'filename': f'{prefix}{live_tag}_{sn}_img{suffix}',
                 'filepath': filepath,
                 'xmp_info': self.gen_meta(sn=sn, url=url),
-            }
+            }]
+            if live:
+                meta.append({
+                    'url': live,
+                    'filename': f'{prefix}{live_tag}_{sn}.mov',
+                    'filepath': filepath,
+                    'xmp_info': self.gen_meta(sn=sn, url=live),
+                })
+            yield meta
         if self.video:
-            yield {
+            yield [{
                 'url': self.video,
                 'filename': f'{prefix}.mp4',
                 'filepath': filepath,
                 'xmp_info': self.gen_meta(url=self.video),
-            }
+            }]
 
     def gen_meta(self, sn: str | int = '', url: str = "") -> dict:
         if (pic_num := len(self.pics)) == 1:

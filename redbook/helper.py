@@ -8,13 +8,19 @@ import execjs
 import httpx
 import pendulum
 from exiftool import ExifToolHelper
+from humanize import naturalsize
+from makelive import is_live_photo_pair, live_id, make_live_photo
+from makelive.makelive import (
+    add_asset_id_to_image_file,
+    add_asset_id_to_quicktime_file
+)
 
 from redbook import console
 
 if not (d := Path('/Volumes/Art')).exists():
     d = Path.home()/'Pictures'
 default_path = d / 'RedBook'
-semaphore = asyncio.Semaphore(1e7)
+semaphore = asyncio.Semaphore(10)
 client = httpx.AsyncClient()
 et = ExifToolHelper()
 
@@ -47,9 +53,44 @@ def convert_js_dict_to_py(js_dict: str) -> dict:
         raise
 
 
-async def download_files(imgs: AsyncIterable[dict]):
-    tasks = [asyncio.create_task(download_single_file(**img)) async for img in imgs]
+async def download_files(imgs: AsyncIterable[list[dict]]):
+    tasks = [asyncio.create_task(download_file_pair(img)) async for img in imgs]
     await asyncio.gather(*tasks)
+
+
+async def download_file_pair(medias: list[dict]):
+    if len(medias) == 1:
+        await download_single_file(**medias[0])
+        return
+    img_info, mov_info = medias
+    img_xmp = img_info.pop('xmp_info')
+    mov_xmp = mov_info.pop('xmp_info')
+    try:
+        img_path = await download_single_file(**img_info)
+        mov_path = await download_single_file(**mov_info)
+    except asyncio.CancelledError:
+        if (img_path := img_info['filepath']).exists():
+            img_path.unlink()
+        if (mov_path := mov_info['filepath']).exists():
+            mov_path.unlink()
+        raise
+    img_size = naturalsize(img_path.stat().st_size)
+    mov_size = naturalsize(mov_path.stat().st_size)
+    if not is_live_photo_pair(img_path, mov_path):
+        assert not (live_id(img_path) and live_id(mov_path))
+        if assert_id := live_id(img_path):
+            add_asset_id_to_quicktime_file(mov_path, assert_id)
+        elif assert_id := live_id(mov_path):
+            add_asset_id_to_image_file(img_path, assert_id)
+        else:
+            make_live_photo(img_path, mov_path)
+    if (x := naturalsize(img_path.stat().st_size)) != img_size:
+        console.log(f'{img_path.name} size changed from {img_size} to {x}')
+    if (x := naturalsize(mov_path.stat().st_size)) != mov_size:
+        console.log(f'{mov_path.name} size changed from {mov_size} to {x}')
+    assert is_live_photo_pair(img_path, mov_path)
+    write_xmp(img_path, img_xmp)
+    write_xmp(mov_path, mov_xmp)
 
 
 async def download_single_file(
@@ -57,20 +98,18 @@ async def download_single_file(
         filepath: Path,
         filename: str,
         xmp_info: dict = None
-):
+) -> Path:
     filepath.mkdir(parents=True, exist_ok=True)
     img = filepath / filename
     headers = {
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188", }
-    if img.suffix == '.webp':
-        suffixs = ['.webp', '.jpg', '.heic']
-    else:
-        assert img.suffix == '.mp4'
-        suffixs = ['.mp4']
+    if img.suffix not in (suffixs := ['.webp', '.jpg', '.heic']):
+        suffixs = ['.mp4', '.mov']
+        assert img.suffix in suffixs
     for suffix in suffixs:
         if (i := img.with_suffix(suffix)).exists():
             console.log(f'{i} already exists..skipping...', style='info')
-            return
+            return i
 
     console.log(f'downloading {img}...', style="dim")
     while True:
@@ -80,7 +119,7 @@ async def download_single_file(
         except httpx.HTTPError as e:
             period = 60
             console.log(
-                f"{e}: Sleepping {period} seconds and "
+                f"{e!r}: sleep {period} seconds and "
                 f"retry [link={url}]{url}[/link]...", style='error')
             await asyncio.sleep(period)
             continue
@@ -105,11 +144,21 @@ async def download_single_file(
             console.log(f'retrying download for {img}')
             continue
 
+        if (mime := r.headers['Content-Type']) != 'application/octet-stream':
+            if mime == 'image/heif':
+                mime = 'image/heic'
+            mime = mime.replace('jpeg', 'jpg').split('/')
+            assert mime[0] in ['image', 'video'], mime
+            suffix = '.' + mime[1]
+            assert suffix in suffixs
+            if mime[0] == 'image':
+                img = img.with_suffix(suffix)
+
         img.write_bytes(r.content)
 
         if xmp_info:
             write_xmp(img, xmp_info)
-        break
+        return img
 
 
 def write_xmp(img: Path, tags: dict):

@@ -269,7 +269,7 @@ def parse_note(note):
         pic_id = pic.split('/')[-1].split('!')[0]
         pic_id_pre = pic_pre.split('/')[-1].split('!')[0]
         assert pic_id == pic_id_pre
-        pic = f'http://sns-img-hw.xhscdn.com/{pic_id}?imageView2/2/w/1000000/format/jpg'
+        pic = f'http://sns-img-hw.xhscdn.com/{pic_id}?imageView2/2/w/0/format/jpg'
         if image.pop('live_photo') is True:
             stream = {k: v for k, v in image.pop('stream').items() if v}
             assert len(stream) == 1
