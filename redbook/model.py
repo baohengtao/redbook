@@ -225,7 +225,7 @@ class UserConfig(BaseModel):
         download_dir = download_dir / user_root / self.username
 
         console.log(f'fetch notes from {since:%Y-%m-%d}\n')
-        note_time_order = []
+        note_time_order, note_ids = [], []
         async for note_info in self.page():
             sticky = note_info.pop('sticky')
             if note := Note.get_or_none(id=note_info['id']):
@@ -257,9 +257,10 @@ class UserConfig(BaseModel):
                             f"{[note.title, note.desc]}", style='error')
             for k, v in note_info.items():
                 if getattr(note, k) != v:
-                    assert k in ['liked_count', 'xsec_token']
+                    assert k in ['liked_count', 'xsec_token', 'liked']
             if not sticky:
                 note_time_order.append(note.time)
+            note_ids.append(note.id)
 
             medias = list(note.medias(download_dir))
             console.log(note)
@@ -271,6 +272,16 @@ class UserConfig(BaseModel):
         if note_time_order:
             console.log(f'{len(note_time_order)} notes fetched')
             assert sorted(note_time_order, reverse=True) == note_time_order
+        if not self.note_fetch_at:
+            for note in self.user.notes.where(Note.id.not_in(note_ids)):
+                console.log(f'find invisible note {note.id}', style='notice')
+                medias = list(note.medias(download_dir))
+                console.log(note)
+                console.log(
+                    f"Downloading {len(medias)} files to {download_dir}..")
+                console.print()
+                for media in medias:
+                    yield media
 
 
 class Note(BaseModel):
