@@ -132,7 +132,7 @@ async def user_loop(frequency: float = 2,
         )
         while pendulum.now() < next_start_time:
             # sleeping for  600 seconds while listing for enter key
-            if select.select([sys.stdin], [], [], 600)[0]:
+            if select.select([sys.stdin], [], [], 60)[0]:
                 match (input().lower()):
                     case "s":
                         console.log(

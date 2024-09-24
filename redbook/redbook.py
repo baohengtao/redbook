@@ -165,6 +165,15 @@ async def get_note_from_web(note_id, params: str = '', parse=True):
         raise
 
 
+async def get_note_short_url(note_id: str) -> dict:
+    data = {
+        "original_url": f"https://www.xiaohongshu.com/discovery/item/{note_id}"
+    }
+    r = await fetcher.post(
+        'https://edith.xiaohongshu.com', '/api/sns/web/short_url', data=data)
+    return r.json()['data']['short_url']
+
+
 async def get_note(note_id, xsec_token=None, parse=True):
     if note_id.startswith('https://www.xiaohongshu.com/explore/'):
         url = furl(note_id)
