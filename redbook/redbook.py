@@ -293,11 +293,9 @@ def parse_note(note):
 
     if 'video' in note:
         stream = note.pop('video').pop('media').pop('stream')
-        # video = media.pop('video')
-        # note['video_md5'] = video['md5']
         stream = {k: v for k, v in stream.items() if v}
-        key, h264 = stream.popitem()
-        assert key in ['h264', 'h265']
+        x = stream.pop('h264', None)
+        h264 = stream.pop('h265', None) or x
         assert not stream
         assert len(h264) == 1
         note['video'] = parse_video_url(h264[0]['master_url'])
