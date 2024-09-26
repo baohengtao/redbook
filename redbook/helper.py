@@ -1,11 +1,13 @@
 import asyncio
 import json
+import mimetypes
 import sys
 from pathlib import Path
 from typing import AsyncIterable
 
 import execjs
 import httpx
+import magic
 import pendulum
 from exiftool import ExifToolHelper
 from humanize import naturalsize
@@ -23,6 +25,7 @@ default_path = d / 'RedBook'
 semaphore = asyncio.Semaphore(10)
 client = httpx.AsyncClient()
 et = ExifToolHelper()
+mime_detector = magic.Magic(mime=True)
 
 
 def normalize_user_id(user_id: str) -> str:
@@ -144,15 +147,11 @@ async def download_single_file(
             console.log(f'retrying download for {img}')
             continue
 
-        if (mime := r.headers['Content-Type']) != 'application/octet-stream':
-            if mime == 'image/heif':
-                mime = 'image/heic'
-            mime = mime.replace('jpeg', 'jpg').split('/')
-            assert mime[0] in ['image', 'video'], mime
-            suffix = '.' + mime[1]
-            assert suffix in suffixs
-            if mime[0] == 'image':
-                img = img.with_suffix(suffix)
+        mime = mime_detector.from_buffer(r.content)
+        suffix = mimetypes.guess_extension(mime)
+        assert suffix in suffixs
+        if mime.startswith('image/'):
+            img = img.with_suffix(suffix)
 
         img.write_bytes(r.content)
 
@@ -169,6 +168,7 @@ def write_xmp(img: Path, tags: dict):
     ext = et.get_tags(img, 'File:FileTypeExtension')[
         0]['File:FileTypeExtension'].lower()
     if (suffix := f'.{ext}') != img.suffix:
+        raise ValueError(f'{img} suffix is not right, should be {suffix}')
         new_img = img.with_suffix(suffix)
         console.log(
             f'{img}: suffix is not right, moving to {new_img}...',
