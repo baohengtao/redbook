@@ -328,9 +328,7 @@ class Note(BaseModel):
     async def from_id(cls, note_id, update=None, xsec_token=None) -> Self:
         note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
         if not update and (note := cls.get_or_none(id=note_id)):
-            date = note.updated_at or note.added_at
-            if update is False or (pendulum.now() - date).in_hours() < 24:
-                return note
+            return note
         if note:
             xsec_token = note.xsec_token
         note_dict = await get_note(note_id, xsec_token)
@@ -364,6 +362,7 @@ class Note(BaseModel):
                 continue
             if key in ['pic_ids', 'pics', 'video', 'video_md5']:
                 assert note_dict['last_update_time'] > model.last_update_time
+                raise ValueError(key)
             console.log(f'+{key}: {value}', style='green bold on dark_green')
             if ori is not None:
                 console.log(f'-{key}: {ori}', style='red bold on dark_red')

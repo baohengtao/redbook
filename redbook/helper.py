@@ -134,9 +134,10 @@ async def download_single_file(
                 f"{url}, {xmp_info}, {r.status_code}", style="error")
             return
         elif r.status_code != 200:
-            console.log(f"{url}, {r.status_code}", style="error")
+            console.log(
+                f"{url}, {r.status_code}, retrying download after 15 seconds",
+                style="error")
             await asyncio.sleep(15)
-            console.log(f'retrying download for {url}...')
             continue
 
         if int(r.headers['Content-Length']) != len(r.content):
