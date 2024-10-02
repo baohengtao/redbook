@@ -171,7 +171,9 @@ async def get_note_short_url(note_id: str) -> dict:
     }
     r = await fetcher.post(
         'https://edith.xiaohongshu.com', '/api/sns/web/short_url', data=data)
-    return r.json()['data']['short_url']
+    short_url: str = r.json()['data']['short_url']
+    assert short_url.startswith('xhslink.com')
+    return f'https://{short_url}'
 
 
 async def get_note(note_id, xsec_token=None, parse=True):

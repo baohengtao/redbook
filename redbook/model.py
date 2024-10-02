@@ -19,7 +19,11 @@ from playhouse.shortcuts import model_to_dict
 
 from redbook import console
 from redbook.helper import download_files, normalize_count
-from redbook.redbook import get_note, get_user, get_user_notes
+from redbook.redbook import (
+    get_note,
+    get_note_short_url,
+    get_user, get_user_notes
+)
 
 database = PostgresqlExtDatabase("redbook", host="localhost")
 
@@ -232,6 +236,9 @@ class UserConfig(BaseModel):
         async for note_info in self.page():
             sticky = note_info.pop('sticky')
             if note := Note.get_or_none(id=note_info['id']):
+                if not note.short_url:
+                    note.short_url = await get_note_short_url(note.id)
+                    note.save()
                 if note.time < since:
                     if sticky:
                         console.log("略过置顶笔记...")
@@ -266,7 +273,7 @@ class UserConfig(BaseModel):
             note_ids.append(note.id)
 
             medias = list(note.medias(download_dir))
-            console.log(note)
+            console.log(note, '\n')
             if self.is_caching:
                 continue
             console.log(
@@ -315,6 +322,7 @@ class Note(BaseModel):
     added_at = DateTimeTZField(null=True)
     updated_at = DateTimeTZField(null=True)
     xsec_token = TextField(null=True)
+    short_url = TextField(null=True)
 
     @classmethod
     async def from_id(cls, note_id, update=None, xsec_token=None) -> Self:
@@ -332,16 +340,18 @@ class Note(BaseModel):
         assert note_dict.pop('nickname') == user.nickname
         assert note_dict['following'] == user.following
         note_dict['username'] = user.username
-        cls.upsert(note_dict)
+        await cls.upsert(note_dict)
         return cls.get_by_id(note_id)
 
     @classmethod
-    def upsert(cls, note_dict):
+    async def upsert(cls, note_dict):
         note_id = note_dict['id']
         assert 'added_at' not in note_dict
         assert 'updated_at' not in note_dict
         if not (model := cls.get_or_none(id=note_id)):
             note_dict['added_at'] = pendulum.now()
+            assert 'short_url' not in note_dict
+            note_dict['short_url'] = await get_note_short_url(note_id)
             return cls.insert(note_dict).execute()
         else:
             note_dict['updated_at'] = pendulum.now()
