@@ -71,10 +71,10 @@ async def download_file_pair(medias: list[dict]):
     try:
         img_path = await download_single_file(**img_info)
         mov_path = await download_single_file(**mov_info)
-    except asyncio.CancelledError:
-        if (img_path := img_info['filepath']).exists():
+    except Exception:
+        if (img_path := img_info['filepath']/img_info['filename']).exists():
             img_path.unlink()
-        if (mov_path := mov_info['filepath']).exists():
+        if (mov_path := mov_info['filepath']/mov_info['filename']).exists():
             mov_path.unlink()
         raise
     img_size = naturalsize(img_path.stat().st_size)
@@ -106,7 +106,7 @@ async def download_single_file(
     img = filepath / filename
     headers = {
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188", }
-    if img.suffix not in (suffixs := ['.webp', '.jpg', '.heic']):
+    if img.suffix not in (suffixs := ['.webp', '.jpg', '.heic', '.png']):
         suffixs = ['.mp4', '.mov']
         assert img.suffix in suffixs
     for suffix in suffixs:
@@ -114,7 +114,6 @@ async def download_single_file(
             console.log(f'{i} already exists..skipping...', style='info')
             return i
 
-    console.log(f'downloading {img}...', style="dim")
     while True:
         try:
             async with semaphore:
@@ -157,6 +156,7 @@ async def download_single_file(
 
         if xmp_info:
             write_xmp(img, xmp_info)
+        console.log(f'🎉 {img} successfully downloaded...', style="dim")
         return img
 
 
