@@ -116,6 +116,7 @@ class UserConfig(BaseModel):
     note_fetch = BooleanField(default=True)
     note_fetch_at = DateTimeTZField(null=True)
     note_next_fetch = DateTimeTZField(null=True)
+    is_caching = BooleanField(default=True)
     post_cycle = IntegerField(null=True)
     age = CharField(null=True)
     description = TextField(null=True)
@@ -223,8 +224,10 @@ class UserConfig(BaseModel):
             if not (download_dir / user_root / self.username).exists():
                 user_root = 'New'
         download_dir = download_dir / user_root / self.username
-
-        console.log(f'fetch notes from {since:%Y-%m-%d}\n')
+        if self.is_caching:
+            console.log(f'caching notes from {since:%Y-%m-%d}\n')
+        else:
+            console.log(f'fetch notes from {since:%Y-%m-%d}\n')
         note_time_order, note_ids = [], []
         async for note_info in self.page():
             sticky = note_info.pop('sticky')
@@ -264,6 +267,8 @@ class UserConfig(BaseModel):
 
             medias = list(note.medias(download_dir))
             console.log(note)
+            if self.is_caching:
+                continue
             console.log(
                 f"Downloading {len(medias)} files to {download_dir}..")
             console.print()
@@ -272,7 +277,7 @@ class UserConfig(BaseModel):
         if note_time_order:
             console.log(f'{len(note_time_order)} notes fetched')
             assert sorted(note_time_order, reverse=True) == note_time_order
-        if not self.note_fetch_at:
+        if not self.note_fetch_at and not self.is_caching:
             for note in self.user.notes.where(Note.id.not_in(note_ids)):
                 console.log(f'find invisible note {note.id}', style='notice')
                 medias = list(note.medias(download_dir))
