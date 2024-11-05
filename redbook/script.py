@@ -40,7 +40,7 @@ class LogSaver:
         self.download_dir = download_dir
         self.save_log_at = pendulum.now()
         self.save_visits_at = fetcher.visits
-        self.SAVE_LOG_INTERVAL = 12  # hours
+        self.SAVE_LOG_INTERVAL = 24  # hours
         self.SAVE_LOG_FOR_COUNT = 100
 
     def save_log(self, save_manually=False):
@@ -165,25 +165,26 @@ async def user(download_dir: Path = default_path):
         f'the latest added user is {user.username} ({user.id, user.nickname})')
 
     while user_id := Prompt.ask('请输入用户名:smile:').strip():
-        if uc := UserConfig.get_or_none(username=user_id):
-            user_id = uc.user_id
+        if config := UserConfig.get_or_none(username=user_id):
+            user_id = config.user_id
         user_id = normalize_user_id(user_id)
-        if uc := UserConfig.get_or_none(user_id=user_id):
-            console.log(f'用户{uc.username}已在列表中')
-        uc = await UserConfig.from_id(user_id)
-        console.log(uc)
-        uc.note_fetch = Confirm.ask(f"是否获取{uc.username}的主页？", default=True)
-        uc.save()
-        console.log(f'用户{uc.username}更新完成')
-        if uc.note_fetch and not uc.following:
-            console.log(f'用户{uc.username}未关注，记得关注🌸', style='notice')
-        elif not uc.note_fetch and uc.following:
-            console.log(f'用户{uc.username}已关注，记得取关🔥', style='notice')
-        if not uc.note_fetch and Confirm.ask('是否删除该用户？', default=False):
-            uc.delete_instance()
+        if config := UserConfig.get_or_none(user_id=user_id):
+            console.log(f'用户{config.username}已在列表中')
+        config = await UserConfig.from_id(user_id)
+        console.log(config)
+        config.note_fetch = Confirm.ask(
+            f"是否获取{config.username}的主页？", default=True)
+        config.save()
+        console.log(f'用户{config.username}更新完成')
+        if config.note_fetch and not config.following:
+            console.log(f'用户{config.username}未关注，记得关注🌸', style='notice')
+        elif not config.note_fetch and config.following:
+            console.log(f'用户{config.username}已关注，记得取关🔥', style='notice')
+        if not config.note_fetch and Confirm.ask('是否删除该用户？', default=False):
+            config.delete_instance()
             console.log('用户已删除')
-        elif uc.note_fetch and Confirm.ask('是否现在抓取', default=False):
-            await uc.fetch_note(download_dir)
+        elif config.note_fetch and Confirm.ask('是否现在抓取', default=False):
+            await config.fetch_note(download_dir)
         console.log()
 
 
