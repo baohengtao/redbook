@@ -187,11 +187,16 @@ async def get_note(note_id, xsec_token=None, parse=True):
                  'extra': {'need_body_topic': 1},
                  'xsec_token': xsec_token
                  }
-    r = await fetcher.post('https://edith.xiaohongshu.com',
-                           '/api/sns/web/v1/feed', note_data)
-    js = r.json()
-    data = js.pop('data')
-    assert js == {'code': 0, 'success': True, 'msg': '成功'}
+    for _ in range(3):
+        r = await fetcher.post('https://edith.xiaohongshu.com',
+                               '/api/sns/web/v1/feed', note_data)
+        js = r.json()
+        data = js.pop('data')
+        if js == {'code': 0, 'success': True, 'msg': '成功'}:
+            break
+        console.log(f'fetch failed: {js}, retrying...', style='error')
+    else:
+        raise ValueError(js)
     items = data.pop('items')
     assert len(items) == 1
     item = items[0]
