@@ -166,6 +166,7 @@ async def get_note_from_web(note_id, params: str = '', parse=True):
 
 
 async def get_note_short_url(note_id: str, xsec_token: str) -> dict:
+    assert xsec_token
     data = dict(original_url="https://www.xiaohongshu.com/discovery/item/"
                 f"{note_id}?xsec_token={xsec_token}&xsec_source=pc_user")
     r = await fetcher.post(

@@ -119,6 +119,7 @@ class UserConfig(BaseModel):
     username = CharField()
     note_fetch = BooleanField(default=True)
     note_fetch_at = DateTimeTZField(null=True)
+    note_refetch_at = DateTimeTZField(null=True)
     note_next_fetch = DateTimeTZField(null=True)
     is_caching = BooleanField(default=True)
     post_cycle = IntegerField(null=True)
@@ -186,7 +187,7 @@ class UserConfig(BaseModel):
                     pendulum.Duration(hours=config.post_cycle))
             config.save()
 
-    async def fetch_note(self, download_dir: Path):
+    async def fetch_note(self, download_dir: Path, refetch=False):
         if not self.note_fetch:
             return
         if self.note_fetch_at:
@@ -196,12 +197,13 @@ class UserConfig(BaseModel):
             msg = f' (fetch_at:{since:%y-%m-%d} {estimated_post})'
         else:
             msg = '(New User)'
+            refetch = True
         console.rule(f"开始获取 {self.username} 的主页 {msg}")
         console.log(self.user)
         console.log(f"Media Saving: {download_dir}")
 
         now = pendulum.now()
-        imgs = self._save_notes(download_dir)
+        imgs = self._save_notes(download_dir, refetch=refetch)
         await download_files(imgs)
         console.log(f"{self.username} 📕 获取完毕\n")
 
@@ -209,11 +211,14 @@ class UserConfig(BaseModel):
         self.post_at = self.user.notes.order_by(Note.time.desc()).first().time
         self.post_cycle = self.get_post_cycle()
         self.note_next_fetch = now.add(hours=self.post_cycle)
+        if refetch:
+            self.note_refetch_at = now
         self.save()
 
     async def _save_notes(
             self,
-            download_dir: Path
+            download_root: Path,
+            refetch=False,
     ) -> AsyncIterator[dict]:
         """
         Save weibo to database and return media info
@@ -225,9 +230,13 @@ class UserConfig(BaseModel):
         user_root = 'User' if (
             self.note_fetch_at and self.photos_num) else 'NewInit'
         if user_root == 'NewInit' and self.note_fetch_at:
-            if not (download_dir / user_root / self.username).exists():
+            if not (download_root / user_root / self.username).exists():
                 user_root = 'New'
-        download_dir = download_dir / user_root / self.username
+        download_dir = download_root / user_root / self.username
+        if user_root == 'User':
+            revisit_dir = download_root / 'Revisit' / self.username
+        else:
+            revisit_dir = download_dir
         if self.is_caching:
             console.log(f'caching notes from {since:%Y-%m-%d}\n')
         else:
@@ -236,15 +245,18 @@ class UserConfig(BaseModel):
         async for note_info in self.page():
             sticky = note_info.pop('sticky')
             if note := Note.get_or_none(id=note_info['id']):
+                assert note.xsec_token
                 if not note.short_url:
+                    note.xsec_token = note_info['xsec_token']
                     note.short_url = await get_note_short_url(
                         note.id, note.xsec_token)
+                    console.log(note.short_url)
                     note.save()
                 if note.time < since:
                     if sticky:
                         console.log("略过置顶笔记...")
                         continue
-                    elif note.time > since.subtract(months=1):
+                    elif refetch or note.time > since.subtract(months=1):
                         continue
                     else:
                         console.log(
@@ -258,6 +270,9 @@ class UserConfig(BaseModel):
                 console.log(
                     f'find note {note.id} before {since:%y-%m-%d} '
                     'but not fetched!', style='error')
+                save_path = revisit_dir
+            else:
+                save_path = download_dir
             display_title = re.sub(
                 r'\s|\n', '', note.title or note.desc or '')
             display_topic = ''.join(note.topics or [])
@@ -273,12 +288,12 @@ class UserConfig(BaseModel):
                 note_time_order.append(note.time)
             note_ids.append(note.id)
 
-            medias = list(note.medias(download_dir))
+            medias = list(note.medias(save_path))
             console.log(note, '\n')
             if self.is_caching:
                 continue
             console.log(
-                f"Downloading {len(medias)} files to {download_dir}..")
+                f"Downloading {len(medias)} files to {save_path}..")
             console.print()
             for media in medias:
                 yield media
