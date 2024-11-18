@@ -237,7 +237,8 @@ class UserConfig(BaseModel):
             sticky = note_info.pop('sticky')
             if note := Note.get_or_none(id=note_info['id']):
                 if not note.short_url:
-                    note.short_url = await get_note_short_url(note.id)
+                    note.short_url = await get_note_short_url(
+                        note.id, note.xsec_token)
                     note.save()
                 if note.time < since:
                     if sticky:
@@ -349,7 +350,8 @@ class Note(BaseModel):
         if not (model := cls.get_or_none(id=note_id)):
             note_dict['added_at'] = pendulum.now()
             assert 'short_url' not in note_dict
-            note_dict['short_url'] = await get_note_short_url(note_id)
+            note_dict['short_url'] = await get_note_short_url(
+                note_id, note_dict['xsec_token'])
             return cls.insert(note_dict).execute()
         else:
             note_dict['updated_at'] = pendulum.now()
@@ -413,7 +415,7 @@ class Note(BaseModel):
             "ImageSupplierName": "RedBook",
             "ImageCreatorName": self.username,
             "BlogTitle": title.strip(),
-            "BlogURL": self.url,
+            "BlogURL": self.short_url or self.url,
             "DateCreated": (self.time +
                             pendulum.Duration(microseconds=int(sn or 0))),
             "SeriesNumber": sn,

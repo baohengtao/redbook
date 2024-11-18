@@ -165,10 +165,9 @@ async def get_note_from_web(note_id, params: str = '', parse=True):
         raise
 
 
-async def get_note_short_url(note_id: str) -> dict:
-    data = {
-        "original_url": f"https://www.xiaohongshu.com/discovery/item/{note_id}"
-    }
+async def get_note_short_url(note_id: str, xsec_token: str) -> dict:
+    data = dict(original_url="https://www.xiaohongshu.com/discovery/item/"
+                f"{note_id}?xsec_token={xsec_token}&xsec_source=pc_user")
     r = await fetcher.post(
         'https://edith.xiaohongshu.com', '/api/sns/web/short_url', data=data)
     short_url: str = r.json()['data']['short_url']
@@ -185,7 +184,8 @@ async def get_note(note_id, xsec_token=None, parse=True):
     note_data = {'source_note_id': note_id,
                  'image_formats': ['jpg', 'webp', 'avif'],
                  'extra': {'need_body_topic': 1},
-                 'xsec_token': xsec_token
+                 'xsec_token': xsec_token,
+                 'xsec_source': 'pc_user',
                  }
     for _ in range(3):
         r = await fetcher.post('https://edith.xiaohongshu.com',
@@ -203,7 +203,7 @@ async def get_note(note_id, xsec_token=None, parse=True):
     note = item.pop('note_card')
     assert 'url' not in note
     assert 'xsec_token' not in note
-    note['url'] = f'https://www.xiaohongshu.com/explore/{note_id}?xsec_token={xsec_token}'
+    note['url'] = f'https://www.xiaohongshu.com/explore/{note_id}?xsec_token={xsec_token}&xsec_source=pc_user'
     note['xsec_token'] = xsec_token
     assert item == {'id': note_id, 'model_type': 'note'}
     try:
