@@ -14,11 +14,12 @@ from redbook import console
 from redbook.fetcher import fetcher
 from redbook.helper import (
     default_path,
+    download_file_pair,
     logsaver_decorator,
     normalize_user_id,
     print_command, save_log
 )
-from redbook.model import User, UserConfig
+from redbook.model import Note, User, UserConfig
 
 app = Typer()
 
@@ -66,12 +67,24 @@ class LogSaver:
 @app.command()
 @logsaver_decorator
 @run_async
+async def note():
+    while note_id := Prompt.ask('请输入微博ID:smile:'):
+        if not (note := Note.get_or_none(id=note_id)):
+            console.log(f'{note_id} not in database, skip...')
+        tasks = [asyncio.create_task(download_file_pair(img))
+                 for img in note.medias(filepath=default_path)]
+        await asyncio.gather(*tasks)
+
+
+@app.command()
+@logsaver_decorator
+@run_async
 async def user_loop(frequency: float = 2,
                     download_dir: Path = default_path,
                     ):
     console.log(f'current logined as: {await fetcher.login()}')
 
-    WORKING_TIME = 20
+    WORKING_TIME = 60
     logsaver = LogSaver('user_loop', download_dir)
     while True:
         print_command()
@@ -174,6 +187,11 @@ async def user(download_dir: Path = default_path):
         console.log(config)
         config.note_fetch = Confirm.ask(
             f"是否获取{config.username}的主页？", default=True)
+        if config.note_fetch and config.is_caching:
+            if not Confirm.ask(
+                    "current is caching, keep caching?", default=True):
+                config.note_fetch_at = None
+                config.is_caching = False
         config.save()
         console.log(f'用户{config.username}更新完成')
         if config.note_fetch and not config.following:
