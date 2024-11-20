@@ -245,13 +245,13 @@ class UserConfig(BaseModel):
         async for note_info in self.page():
             sticky = note_info.pop('sticky')
             if note := Note.get_or_none(id=note_info['id']):
-                assert note.xsec_token
                 if not note.short_url:
                     note.xsec_token = note_info['xsec_token']
                     note.short_url = await get_note_short_url(
                         note.id, note.xsec_token)
                     console.log(note.short_url)
                     note.save()
+                assert note.xsec_token
                 if note.time < since:
                     if sticky:
                         console.log("略过置顶笔记...")
