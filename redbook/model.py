@@ -6,10 +6,9 @@ from typing import AsyncIterator, Iterator, Self
 import pendulum
 from peewee import Model
 from photosinfo.model import GirlSearch
+from playhouse.postgres_ext import ArrayField, BooleanField, CharField
+from playhouse.postgres_ext import DateTimeTZField as RawDateTimeTZField
 from playhouse.postgres_ext import (
-    ArrayField, BooleanField,
-    CharField,
-    DateTimeTZField,
     ForeignKeyField,
     IntegerField, JSONField,
     PostgresqlExtDatabase,
@@ -26,6 +25,13 @@ from redbook.redbook import (
 )
 
 database = PostgresqlExtDatabase("redbook", host="localhost")
+
+
+class DateTimeTZField(RawDateTimeTZField):
+    def python_value(self, value):
+        if value is not None:
+            return pendulum.instance(value)
+        return value
 
 
 class BaseModel(Model):
@@ -190,8 +196,7 @@ class UserConfig(BaseModel):
     async def fetch_note(self, download_dir: Path, refetch=False):
         if not self.note_fetch:
             return
-        if self.note_fetch_at:
-            since = pendulum.instance(self.note_fetch_at)
+        if since := self.note_fetch_at:
             estimated_post = since.diff().in_hours() / self.post_cycle
             estimated_post = f'estimated_new_posts:{estimated_post:.2f}'
             msg = f' (fetch_at:{since:%y-%m-%d} {estimated_post})'
@@ -225,8 +230,7 @@ class UserConfig(BaseModel):
         :return: generator of medias to downloads
         """
 
-        since = pendulum.instance(
-            self.note_fetch_at or pendulum.from_timestamp(0))
+        since = self.note_fetch_at or pendulum.from_timestamp(0)
         user_root = 'User' if (
             self.note_fetch_at and self.photos_num) else 'NewInit'
         if user_root == 'NewInit' and self.note_fetch_at:
