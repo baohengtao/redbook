@@ -140,6 +140,7 @@ class UserConfig(BaseModel):
     photos_num = IntegerField(null=True)
     folder = CharField(null=True)
     added_at = DateTimeTZField(null=True, default=pendulum.now)
+    notes_count = IntegerField(default=0)
 
     def __str__(slef):
         return super().__repr__()
@@ -193,7 +194,9 @@ class UserConfig(BaseModel):
                     pendulum.Duration(hours=config.post_cycle))
             config.save()
 
-    async def fetch_note(self, download_dir: Path, refetch=False):
+    async def fetch_note(self, download_dir: Path):
+        refetch = (self.notes_count < 50 or not self.note_refetch_at or
+                   self.note_refetch_at.diff().in_days() > self.notes_count/10)
         if not self.note_fetch:
             return
         if since := self.note_fetch_at:
@@ -202,7 +205,7 @@ class UserConfig(BaseModel):
             msg = f' (fetch_at:{since:%y-%m-%d} {estimated_post})'
         else:
             msg = '(New User)'
-            refetch = True
+            assert refetch is True
         console.rule(f"开始获取 {self.username} 的主页 {msg}")
         console.log(self.user)
         console.log(f"Media Saving: {download_dir}")
