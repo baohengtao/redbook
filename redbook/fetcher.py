@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from DrissionPage import ChromiumOptions, ChromiumPage
-from httpx import HTTPError, Response
+from httpx import HTTPError, HTTPStatusError, Response
 
 from redbook import console
 from redbook.client.client import GetXS
@@ -62,6 +62,8 @@ class Fetcher:
                 console.log(f'{method} {url}  was cancelled.', style='error')
                 raise
             except HTTPError as e:
+                if isinstance(e, HTTPStatusError) and r.status_code == 461:
+                    raise
                 period = 30 * ((try_time % 10) or 30)
                 console.log(
                     f"{e!r}: failed on {try_time}th trys, sleeping {period} "
