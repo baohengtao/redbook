@@ -284,9 +284,12 @@ def parse_note(note):
         assert (pic := image.pop('url_default')) == info_list.pop('WB_DFT')
         assert (pic_pre := image.pop('url_pre')) == info_list.pop('WB_PRV')
         assert not info_list
-        pic_id = pic.split('/')[-1].split('!')[0]
-        pic_id_pre = pic_pre.split('/')[-1].split('!')[0]
+        *pic, pic_id = pic.split('!')[0].split('/')
+        *pic_pre, pic_id_pre = pic_pre.split('!')[0].split('/')
         assert pic_id == pic_id_pre
+        if pic[-1] == 'spectrum':
+            assert pic_pre[-1] == pic[-1]
+            pic_id = f'spectrum/{pic_id}'
         pic = f'http://sns-img-hw.xhscdn.com/{pic_id}?imageView2/2/w/100000/format/jpg'
         if image.pop('live_photo') is True:
             stream = {k: v for k, v in image.pop('stream').items() if v}

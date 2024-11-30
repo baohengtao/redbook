@@ -354,7 +354,7 @@ class Note(BaseModel):
     @classmethod
     async def from_id(cls, note_id, update=None, xsec_token=None) -> Self:
         note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
-        if not update and (note := cls.get_or_none(id=note_id)):
+        if (note := cls.get_or_none(id=note_id)) and not update:
             return note
         if note:
             xsec_token = note.xsec_token
