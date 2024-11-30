@@ -27,12 +27,9 @@ class GetXS:
 
 async def get_client(cookies=None):
     playwright = await async_playwright().start()
-    chromium = playwright.chromium
-    user_data_dir = Path(__file__).parent / "browser_data"
-    browser_context = await chromium.launch_persistent_context(
-        user_data_dir=user_data_dir,
-        viewport={"width": 1920, "height": 1080},
-    )
+    browser = await playwright.chromium.launch()
+    browser_context = await browser.new_context(
+        viewport={"width": 1920, "height": 1080})
     await browser_context.add_init_script(
         path=Path(__file__).parent/'stealth.min.js')
     context_page = await browser_context.new_page()
