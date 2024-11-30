@@ -15,6 +15,7 @@ from playhouse.postgres_ext import (
     TextField
 )
 from playhouse.shortcuts import model_to_dict
+from rich.prompt import Confirm
 
 from redbook import console
 from redbook.helper import download_files, normalize_count
@@ -90,8 +91,11 @@ class User(BaseModel):
                 user_dict = await get_user(user_id)
                 if not model or user_dict['following'] == model.following:
                     break
-            if not model:
-                assert user_dict['following'] is True
+            else:
+                console.log(model)
+                if not Confirm.ask('following status changed?'):
+                    raise ValueError('following status changed!')
+
             cls.upsert(user_dict)
         return cls.get_by_id(user_id)
 
