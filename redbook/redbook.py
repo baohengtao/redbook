@@ -189,17 +189,9 @@ async def get_note(note_id, xsec_token=None, parse=True):
                  'xsec_token': xsec_token,
                  'xsec_source': 'pc_user',
                  }
-    note_url = f'https://www.xiaohongshu.com/explore/{note_id}?xsec_token={xsec_token}&xsec_source=pc_user'
     for _ in range(3):
-        try:
-            r = await fetcher.post('https://edith.xiaohongshu.com',
-                                   '/api/sns/web/v1/feed', note_data)
-        except HTTPStatusError as e:
-            assert e.response.status_code == 461
-            console.log('461 ERROR', style='error')
-            print(note_url)
-            input('press enter after pass verification...')
-            continue
+        r = await fetcher.post('https://edith.xiaohongshu.com',
+                               '/api/sns/web/v1/feed', note_data)
         js = r.json()
         data = js.pop('data')
         if js == {'code': 0, 'success': True, 'msg': '成功'}:
@@ -213,7 +205,7 @@ async def get_note(note_id, xsec_token=None, parse=True):
     note = item.pop('note_card')
     assert 'url' not in note
     assert 'xsec_token' not in note
-    note['url'] = note_url
+    note['url'] = f'https://www.xiaohongshu.com/explore/{note_id}?xsec_token={xsec_token}&xsec_source=pc_user'
     note['xsec_token'] = xsec_token
     assert item == {'id': note_id, 'model_type': 'note'}
     try:
