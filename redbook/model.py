@@ -220,7 +220,8 @@ class UserConfig(BaseModel):
         console.log(f"{self.username} 📕 获取完毕\n")
 
         self.note_fetch_at = now
-        self.post_at = self.user.notes.order_by(Note.time.desc()).first().time
+        if notes := self.user.notes.order_by(Note.time.desc()):
+            self.post_at = notes.first().time
         self.post_cycle = self.get_post_cycle()
         self.note_next_fetch = now.add(hours=self.post_cycle)
         if refetch:

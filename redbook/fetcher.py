@@ -63,7 +63,9 @@ class Fetcher:
                 raise
             except HTTPError as e:
                 if isinstance(e, HTTPStatusError) and r.status_code == 461:
+                    console.log(r.text)
                     input('461 ERROR, press enter after pass verification...')
+                    continue
                 period = 30 * ((try_time % 10) or 30)
                 console.log(
                     f"{e!r}: failed on {try_time}th trys, sleeping {period} "

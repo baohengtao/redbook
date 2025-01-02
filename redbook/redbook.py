@@ -2,12 +2,11 @@ import itertools
 import re
 import time
 from copy import deepcopy
-from typing import Iterator
+from typing import AsyncIterator
 
 import pendulum
 from camel_converter import dict_to_snake
 from furl import furl
-from httpx import HTTPStatusError
 
 from redbook import console
 from redbook.fetcher import fetcher
@@ -119,7 +118,7 @@ def _parse_user(user_info: dict) -> dict:
     return user_sorted
 
 
-async def get_user_notes(user_id: str) -> Iterator[dict]:
+async def get_user_notes(user_id: str) -> AsyncIterator[dict]:
     cursor = ''
     for page in itertools.count(start=1):
         console.log(f'fetching page {page}...')
@@ -228,6 +227,7 @@ def parse_note(note):
     note = deepcopy(note)
     for key in ['user',  'share_info', 'interact_info']:
         value = note.pop(key)
+        value.pop('xsec_token', None)
         assert note | value == value | note
         note |= value
     note.pop('illegal_info', None)
@@ -287,9 +287,9 @@ def parse_note(note):
         *pic, pic_id = pic.split('!')[0].split('/')
         *pic_pre, pic_id_pre = pic_pre.split('!')[0].split('/')
         assert pic_id == pic_id_pre
-        if pic[-1] == 'spectrum':
+        if (prefix := pic[-1]) in ['spectrum', 'notes_pre_post']:
             assert pic_pre[-1] == pic[-1]
-            pic_id = f'spectrum/{pic_id}'
+            pic_id = f'{prefix}/{pic_id}'
         pic = f'http://sns-img-hw.xhscdn.com/{pic_id}?imageView2/2/w/100000/format/jpg'
         if image.pop('live_photo') is True:
             stream = {k: v for k, v in image.pop('stream').items() if v}
