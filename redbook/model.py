@@ -75,6 +75,7 @@ class User(BaseModel):
     interaction = IntegerField()
     profession = ArrayField(field_class=TextField, null=True)
     verified = BooleanField()
+    verified_type = IntegerField(null=True)
     collection_public = BooleanField()
     avatar = TextField()
     added_at = DateTimeTZField(null=True, default=pendulum.now)

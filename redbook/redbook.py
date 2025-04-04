@@ -99,7 +99,8 @@ def _parse_user(user_info: dict) -> dict:
 
     assert 'verified' not in user
     if verifyInfo := user.pop('verifyInfo', None):
-        assert verifyInfo == {'redOfficialVerifyType': 1}
+        user['verified_type'] = verifyInfo.pop('redOfficialVerifyType')
+        assert not verifyInfo
         user['verified'] = True
     else:
         user['verified'] = False
