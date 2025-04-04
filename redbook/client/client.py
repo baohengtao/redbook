@@ -3,7 +3,11 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 import requests
-from playwright.async_api import BrowserContext, Cookie, Page, async_playwright
+from playwright.async_api import (
+    Browser, BrowserContext,
+    Cookie, Page,
+    async_playwright
+)
 
 from redbook import console
 from redbook.client.help import sign
@@ -24,6 +28,9 @@ class GetXS:
         xs = (await self.client._pre_headers(api, data)) if api else {}
         return self.client.headers | xs
 
+    async def aclose(self):
+        await self.client.browser.close()
+
 
 async def get_client(cookies=None):
     playwright = await async_playwright().start()
@@ -38,6 +45,7 @@ async def get_client(cookies=None):
         await browser_context.cookies(),
         playwright_page=context_page,
         browser_context=browser_context,
+        browser=browser,
     )
     if cookies:
         console.log('login...')
@@ -60,6 +68,7 @@ class XiaoHongShuClient:
     def __init__(self,
                  cookies,
                  playwright_page: Page,
+                 browser: Browser,
                  browser_context: BrowserContext):
         cookie_str, cookie_dict = convert_cookies(cookies)
         self.headers = {
@@ -72,6 +81,7 @@ class XiaoHongShuClient:
         self.playwright_page = playwright_page
         self.cookie_dict = cookie_dict
         self.browser_context = browser_context
+        self.browser = browser
 
     async def _pre_headers(self, api: str, data=None) -> dict:
         encrypt_params = await self.playwright_page.evaluate(
