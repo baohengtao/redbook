@@ -106,7 +106,7 @@ class Fetcher:
             sleep_time = 4
         else:
             sleep_time = 2
-        sleep_time *= random.uniform(0.9, 1.1) * 5
+        sleep_time *= random.uniform(0.9, 1.1) * 2
         self._last_fetch += sleep_time
         if (wait_time := (self._last_fetch-time.time())) > 0:
             console.log(

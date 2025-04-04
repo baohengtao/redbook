@@ -42,7 +42,7 @@ class LogSaver:
         self.save_log_at = pendulum.now()
         self.save_visits_at = fetcher.visits
         self.SAVE_LOG_INTERVAL = 24  # hours
-        self.SAVE_LOG_FOR_COUNT = 100
+        self.SAVE_LOG_FOR_COUNT = 200
 
     def save_log(self, save_manually=False):
         fetch_count = fetcher.visits - self.save_visits_at
@@ -84,7 +84,6 @@ async def user_loop(frequency: float = 2,
                     ):
     console.log(f'current logined as: {await fetcher.login()}')
 
-    WORKING_TIME = 60
     logsaver = LogSaver('user_loop', download_dir)
     while True:
         print_command()
@@ -92,7 +91,6 @@ async def user_loop(frequency: float = 2,
         post_count = ((time.time()-UserConfig.note_fetch_at.to_timestamp())
                       / UserConfig.post_cycle).desc()
 
-        start_time = pendulum.now()
         query = (UserConfig.select()
                  .where(UserConfig.note_fetch)
                  .order_by(post_count, UserConfig.id)
@@ -118,8 +116,6 @@ async def user_loop(frequency: float = 2,
                 'no user satisfy fetching conditions, '
                 f'fetching {limit} users whose note_fetch_at is earliest.')
         for i, config in enumerate(configs[:limit]):
-            if start_time.diff().in_minutes() > WORKING_TIME:
-                break
             console.log(
                 f'fetching {i+1}/{limit}: {config.username} '
                 f'(total: {len(configs)})')
@@ -130,9 +126,6 @@ async def user_loop(frequency: float = 2,
                 logsaver.save_log(save_manually=True)
                 print_command()
 
-        console.log(
-            f'have been working for {start_time.diff().in_minutes()}m '
-            f'which is more than {WORKING_TIME}m, taking a break')
         logsaver.save_log()
         next_start_time = pendulum.now().add(hours=frequency)
         console.rule(f'waiting for next fetching at {next_start_time:%H:%M:%S}',

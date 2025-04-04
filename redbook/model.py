@@ -406,8 +406,10 @@ class Note(BaseModel):
                 'filepath': filepath,
                 'xmp_info': self.gen_meta(url=self.video),
             }]
-            assert len(self.pics) == 1
-            return
+            if len(self.pics) == 1:
+                return
+            else:
+                console.log('seems video is a set of imgs', style='error')
         for sn, url in enumerate(self.pics, start=1):
             if ' ' not in url:
                 url += ' '
