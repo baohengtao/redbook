@@ -4,9 +4,9 @@ import logging
 import pickle
 import random
 import time
+from http.cookies import SimpleCookie
 from pathlib import Path
 
-from DrissionPage import ChromiumOptions, ChromiumPage
 from httpx import HTTPError, HTTPStatusError, Response
 
 from redbook import console
@@ -42,12 +42,9 @@ class Fetcher:
         if cookie_file.exists():
             cookies = pickle.loads(cookie_file.read_bytes())
         else:
-            co = ChromiumOptions().use_system_user_path()
-            browser = ChromiumPage(co)
-            browser.get('https://www.xiaohongshu.com/')
-            input('press enter after login...')
-            cookies = browser.get_cookies()
-            browser.quit()
+            cookie_text = input('input cookie text...')
+            cookies = SimpleCookie()
+            cookies.load(cookie_text)
             cookie_file = Path(__file__).with_name('cookie.pkl')
             cookie_file.write_bytes(pickle.dumps(cookies))
         return cookies

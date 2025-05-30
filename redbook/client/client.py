@@ -1,4 +1,5 @@
 import json
+from http.cookies import SimpleCookie
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -111,14 +112,13 @@ class XiaoHongShuClient:
         return requests.post(
             url=f"{url}{api}", data=json_str, headers=headers)
 
-    async def login(self, cookies):
-        for cookie in cookies:
-            key, value = cookie.get('name'), cookie.get('value')
+    async def login(self, cookies: SimpleCookie):
+        for key, morsel in cookies.items():
             if key != "web_session":  # only set web_session cookie attr
                 continue
             await self.browser_context.add_cookies([{
                 'name': key,
-                'value': value,
+                'value': morsel.value,
                 'domain': ".xiaohongshu.com",
                 'path': "/"
             }])
