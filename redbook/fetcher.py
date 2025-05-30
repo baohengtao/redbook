@@ -85,18 +85,13 @@ class Fetcher:
         url += api
         return await self.request('Post', url, headers=headers, data=data)
 
-    async def recreate_xs_getter(self):
-        console.log('recreate xs_getter...', style='info')
-        await self.xs_getter.aclose()
-        self.xs_getter = GetXS(self.cookies)
-
     async def _get_xs(self, api, data=''):
         while True:
             try:
                 return await self.xs_getter.get_header(api, data)
             except Exception as e:
                 console.log(f'{e!r}: recreate xs_getter...', style='error')
-                await self.recreate_xs_getter()
+                await self.xs_getter.aclose()
                 continue
 
     async def _pause(self):

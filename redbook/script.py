@@ -136,6 +136,7 @@ async def user_loop(frequency: float = 2,
             "Q to exit,\n",
             style='info'
         )
+        await fetcher.xs_getter.aclose()
         while pendulum.now() < next_start_time:
             # sleeping for  600 seconds while listing for enter key
             if select.select([sys.stdin], [], [], 60)[0]:

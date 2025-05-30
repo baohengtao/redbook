@@ -31,6 +31,7 @@ class GetXS:
 
     async def aclose(self):
         await self.client.browser.close()
+        self.client = None
 
 
 async def get_client(cookies=None):
