@@ -123,8 +123,9 @@ async def get_user_notes(user_id: str) -> AsyncIterator[dict]:
     cursor = ''
     for page in itertools.count(start=1):
         console.log(f'fetching page {page}...')
+        # don't change this, or you will be detected by xhs server
         api = ("/api/sns/web/v1/user_posted?num=30&image_formats=jpg,webp,avif"
-               f"&cursor={cursor}&user_id={user_id}")
+               f"&cursor={cursor}&user_id={user_id}&xsec_token=&xsec_source=")
         url = 'https://edith.xiaohongshu.com'
         js = (await fetcher.get(url=url, api=api)).json()
         data = js.pop('data')

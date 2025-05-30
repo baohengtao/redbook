@@ -106,8 +106,8 @@ async def download_single_file(
     img = filepath / filename
     headers = {
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188", }
-    if img.suffix not in (suffixs := ['.webp', '.jpg', '.heic', '.png']):
-        suffixs = ['.mp4', '.mov']
+    if img.suffix not in (suffixs := ['.mp4', '.mov']):
+        suffixs = ['.webp', '.jpg', '.heic', '.png', '.heif']
         assert img.suffix in suffixs
     for suffix in suffixs:
         if (i := img.with_suffix(suffix)).exists():
@@ -169,11 +169,10 @@ def write_xmp(img: Path, tags: dict):
     ext = et.get_tags(img, 'File:FileTypeExtension')[
         0]['File:FileTypeExtension'].lower()
     if (suffix := f'.{ext}') != img.suffix:
-        raise ValueError(f'{img} suffix is not right, should be {suffix}')
         new_img = img.with_suffix(suffix)
         console.log(
             f'{img}: suffix is not right, moving to {new_img}...',
-            style='info')
+            style='error')
         img = img.rename(new_img)
     et.set_tags(img, tags, params=params)
 
