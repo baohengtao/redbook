@@ -143,8 +143,7 @@ async def get_user_notes(user_id: str) -> AsyncIterator[dict]:
         if not has_more:
             console.log(
                 f"seems reached end at page {page} for {url+api} "
-                "since not has_more",
-                style='warning')
+                "since not has_more")
             break
         assert cursor
 

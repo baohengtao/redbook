@@ -45,12 +45,11 @@ class Fetcher:
             cookie_text = input('input cookie text...')
             cookies = SimpleCookie()
             cookies.load(cookie_text)
-            cookie_file = Path(__file__).with_name('cookie.pkl')
             cookie_file.write_bytes(pickle.dumps(cookies))
         return cookies
 
     async def request(self, method, url, **kwargs) -> Response:
-        for try_time in range(1, 100):
+        for try_time in range(1, 20):
             try:
                 await self._pause()
                 r = await client.request(method, url, **kwargs)
