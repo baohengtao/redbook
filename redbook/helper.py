@@ -9,6 +9,7 @@ import execjs
 import httpx
 import magic
 import pendulum
+import truststore
 from exiftool import ExifToolHelper
 from humanize import naturalsize
 from makelive import is_live_photo_pair, live_id, make_live_photo
@@ -18,6 +19,8 @@ from makelive.makelive import (
 )
 
 from redbook import console
+
+truststore.inject_into_ssl()
 
 if not (d := Path('/Volumes/Art')).exists():
     d = Path.home()/'Pictures'
