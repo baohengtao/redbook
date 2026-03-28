@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import AsyncIterator, Iterator, Self
 
+import keyring
 import pendulum
 from peewee import Model
 from photosinfo.model import GirlSearch
@@ -25,7 +26,16 @@ from redbook.redbook import (
     get_user, get_user_notes
 )
 
-database = PostgresqlExtDatabase("redbook", host="localhost")
+database = PostgresqlExtDatabase(
+    'redbook', host='localhost',
+    password=keyring.get_password('postgresql', 'cooper'),
+    sslmode="disable",
+    gssencmode="disable",
+    connect_timeout=3)
+try:
+    database.connect()
+except Exception as e:
+    raise ValueError('cannot connect to database') from e
 
 
 class DateTimeTZField(RawDateTimeTZField):

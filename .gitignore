@@ -6,3 +6,4 @@ cookie.pkl
 *.ipynb
 browser_data
 MediaCrawler
+.vscode
