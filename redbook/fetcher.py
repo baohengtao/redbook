@@ -7,11 +7,11 @@ import time
 from http.cookies import SimpleCookie
 from pathlib import Path
 
+import httpx
 from httpx import HTTPError, HTTPStatusError, Response
 
 from redbook import console
-from redbook.client.client import GetXS
-from redbook.helper import client
+from redbook.client_v2.xhs_util import generate_headers, splice_str
 
 httpx_logger = logging.getLogger("httpx")
 httpx_logger.disabled = True
@@ -19,17 +19,30 @@ httpx_logger.disabled = True
 BASE_URL = 'https://edith.xiaohongshu.com'
 
 
+def load_cookie() -> dict:
+    cookie_file = Path(__file__).with_name('cookie.pkl')
+    if cookie_file.exists():
+        cookies = pickle.loads(cookie_file.read_bytes())
+    else:
+        cookie_text = input('input cookie text...')
+        cookies = SimpleCookie()
+        cookies.load(cookie_text)
+        cookie_file.write_bytes(pickle.dumps(cookies))
+    cookies = {k: v.value for k, v in cookies.items()}
+    return cookies
+
+
 class Fetcher:
     def __init__(self) -> None:
-        self.cookies = self.load_cookie()
-        self.xs_getter = GetXS(self.cookies)
+        self.cookies = load_cookie()
+        self.client = httpx.AsyncClient(cookies=self.cookies)
         self._visit_count = 0
         self.visits = 0
         self._last_fetch = time.time()
 
     async def login(self):
         while True:
-            r = await self.get(BASE_URL+'/api/sns/web/v2/user/me')
+            r = await self.get('/api/sns/web/v2/user/me')
             js = r.json()
             if js.pop('success'):
                 return js["data"]["nickname"]
@@ -38,31 +51,22 @@ class Fetcher:
             Path(__file__).with_name('cookie.pkl').unlink(missing_ok=True)
             raise ValueError('not logined')
 
-    def load_cookie(self):
-        cookie_file = Path(__file__).with_name('cookie.pkl')
-        if cookie_file.exists():
-            cookies = pickle.loads(cookie_file.read_bytes())
-        else:
-            cookie_text = input('input cookie text...')
-            cookies = SimpleCookie()
-            cookies.load(cookie_text)
-            cookie_file.write_bytes(pickle.dumps(cookies))
-        return cookies
-
     async def request(self, method, url, **kwargs) -> Response:
         for try_time in range(1, 20):
             try:
                 await self._pause()
-                r = await client.request(method, url, **kwargs)
+                r = await self.client.request(method, url, **kwargs)
                 r.raise_for_status()
             except asyncio.CancelledError:
                 console.log(f'{method} {url}  was cancelled.', style='error')
                 raise
             except HTTPError as e:
-                if isinstance(e, HTTPStatusError) and r.status_code == 461:
+                if isinstance(e, HTTPStatusError) and r.status_code in [461, 302]:
                     console.log(r.text)
-                    input('461 ERROR, press enter after pass verification...')
+                    input(f'{r.status_code} ERROR, verification needed...')
                     continue
+                if r.status_code == 406:
+                    raise ValueError(f'Failed to fetch: {r.text}')
                 period = 30 * ((try_time % 10) or 30)
                 console.log(
                     f"{e!r}: failed on {try_time}th trys, sleeping {period} "
@@ -74,23 +78,18 @@ class Fetcher:
         else:
             raise ConnectionError('request failed')
 
-    async def get(self, url, params='') -> Response:
-        headers = await self._get_xs_v2(url, params, 'GET')
-        return await self.request('Get', url, headers=headers, params=params)
+    async def get(self, api, params: dict = None) -> Response:
+        splice_api = splice_str(api, params)
+        headers, _ = self.get_headers(splice_api, method='GET')
+        return await self.request('GET', BASE_URL+splice_api, headers=headers)
 
-    async def post(self, url, data: dict) -> Response:
-        data = json.dumps(data, separators=(',', ':'))
-        headers = await self._get_xs_v2(url, data, method='POST')
-        return await self.request('Post', url, headers=headers, data=data)
+    async def post(self, api, data: dict) -> Response:
+        headers, data = self.get_headers(api, data=data, method='POST')
+        return await self.request('POST', BASE_URL+api, headers=headers, data=data)
 
-    async def _get_xs_v2(self, url: str, data: str | dict, method: str):
-        while True:
-            try:
-                return await self.xs_getter.get_header_v2(url, data, method)
-            except Exception as e:
-                console.log(f'{e!r}: recreate xs_getter...', style='error')
-                await self.xs_getter.aclose()
-                continue
+    def get_headers(self, api: str, data: dict = None, method: str = 'POST'):
+        headers, data = generate_headers(self.cookies['a1'], api, data, method)
+        return headers, data
 
     async def _pause(self):
         self.visits += 1

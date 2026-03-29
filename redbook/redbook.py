@@ -1,31 +1,22 @@
 import itertools
-import re
 import time
 from copy import deepcopy
 from typing import AsyncIterator
 
 import pendulum
-from camel_converter import dict_to_snake
 from furl import furl
 
 from redbook import console
-from redbook.fetcher import BASE_URL, fetcher
-from redbook.helper import convert_js_dict_to_py, normalize_count
+from redbook.fetcher import fetcher
+from redbook.helper import normalize_count
 
 
 async def get_user(user_id: str, parse: bool = True) -> dict:
     while True:
-        url = f"https://www.xiaohongshu.com/user/profile/{user_id}"
-        r = await fetcher.get(url)
-        try:
-            info = re.findall(
-                r'<script>window.__INITIAL_STATE__=(.*?)</script>', r.text)[0]
-        except Exception:
-            console.log(f'find failed: {r.text}', style='error')
-            raise
-        info = convert_js_dict_to_py(info)
-        user_info = info['user']['userPageData']
-
+        r = await fetcher.get("/api/sns/web/v1/user/otherinfo",  {"target_user_id": user_id})
+        js = r.json()
+        user_info = js.pop('data')
+        assert js == {'code': 0, 'success': True, 'msg': '成功'}
         assert user_info.pop('result') == {
             'success': True, 'code': 0, 'message': 'success'}
 
@@ -33,7 +24,7 @@ async def get_user(user_id: str, parse: bool = True) -> dict:
         user_info['id'] = user_id
 
         assert 'homepage' not in user_info
-        user_info['homepage'] = url
+        user_info['homepage'] = f"https://www.xiaohongshu.com/user/profile/{user_id}"
         try:
             return _parse_user(user_info) if parse else user_info
         except ValueError as e:
@@ -44,9 +35,8 @@ async def get_user(user_id: str, parse: bool = True) -> dict:
 
 
 def _parse_user(user_info: dict) -> dict:
-    #
-    user = user_info.pop('basicInfo')
-    extra_info = user_info.pop('extraInfo')
+    user = user_info.pop('basic_info')
+    extra_info = user_info.pop('extra_info')
     assert user | extra_info == extra_info | user
     user |= extra_info
 
@@ -76,12 +66,6 @@ def _parse_user(user_info: dict) -> dict:
     assert avatar not in user
     user['avatar'] = avatar
 
-    assert 'red_id' not in user
-    user['red_id'] = user.pop('redId')
-
-    assert 'ip_location' not in user
-    user['ip_location'] = user.pop('ipLocation')
-
     assert 'description' not in user
     user['description'] = user.pop('desc')
 
@@ -95,7 +79,7 @@ def _parse_user(user_info: dict) -> dict:
         assert fstatus == 'none'
         user['following'] = False
 
-    user['collection_public'] = user.pop('tabPublic')['collection']
+    user['collection_public'] = user.pop('tab_public')['collection']
 
     assert 'verified' not in user
     if verifyInfo := user.pop('verifyInfo', None):
@@ -119,15 +103,20 @@ def _parse_user(user_info: dict) -> dict:
     return user_sorted
 
 
-async def get_user_notes(user_id: str) -> AsyncIterator[dict]:
+async def get_user_notes(user_id: str, xsec_token: str = '', xsec_source: str = '') -> AsyncIterator[dict]:
     cursor = ''
     for page in itertools.count(start=1):
         console.log(f'fetching page {page}...')
-        # don't change this, or you will be detected by xhs server
-        params = ("num=30&image_formats=jpg,webp,avif"
-                  f"&cursor={cursor}&user_id={user_id}&xsec_token=&xsec_source=pc_feed")
-        url = BASE_URL + "/api/sns/web/v1/user_posted"
-        js = (await fetcher.get(url=url, params=params)).json()
+        params = {
+            "num": "30",
+            "cursor": cursor,
+            "user_id": user_id,
+            "image_formats": "jpg,webp,avif",
+            "xsec_token": xsec_token,
+            "xsec_source": xsec_source,
+        }
+        api = "/api/sns/web/v1/user_posted"
+        js = (await fetcher.get(api=api, params=params)).json()
         data = js.pop('data')
         assert js == {'success': True, 'msg': '成功', 'code': 0}
 
@@ -141,9 +130,7 @@ async def get_user_notes(user_id: str) -> AsyncIterator[dict]:
             yield note
         assert not data
         if not has_more:
-            console.log(
-                f"seems reached end at page {page} for {url+api} "
-                "since not has_more")
+            console.log(f"seems reached end at page {page} since not has_more")
             break
         assert cursor
 
@@ -152,13 +139,13 @@ async def get_note_short_url(note_id: str, xsec_token: str) -> dict:
     assert xsec_token
     data = dict(original_url="https://www.xiaohongshu.com/discovery/item/"
                 f"{note_id}?xsec_token={xsec_token}&xsec_source=pc_user")
-    r = await fetcher.post(BASE_URL+'/api/sns/web/short_url', data=data)
+    r = await fetcher.post('/api/sns/web/short_url', data=data)
     short_url: str = r.json()['data']['short_url']
     assert short_url.startswith('xhslink.com')
     return f'https://{short_url}'
 
 
-async def get_note(note_id, xsec_token=None, parse=True):
+async def get_note(note_id, xsec_token='', parse=True):
     if note_id.startswith('https://www.xiaohongshu.com/explore/'):
         url = furl(note_id)
         note_id = url.path.segments[-1]
@@ -171,7 +158,7 @@ async def get_note(note_id, xsec_token=None, parse=True):
                  'xsec_source': 'pc_user',
                  }
     for _ in range(3):
-        r = await fetcher.post(BASE_URL+'/api/sns/web/v1/feed', note_data)
+        r = await fetcher.post('/api/sns/web/v1/feed', note_data)
         js = r.json()
         data = js.pop('data')
         if js == {'code': 0, 'success': True, 'msg': '成功'}:
