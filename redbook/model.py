@@ -15,7 +15,7 @@ from playhouse.postgres_ext import (
     PostgresqlExtDatabase,
     TextField
 )
-from playhouse.shortcuts import model_to_dict
+from playhouse.shortcuts import model_to_dict, update_model_from_dict
 from rich.prompt import Confirm
 
 from redbook import console
@@ -23,7 +23,8 @@ from redbook.helper import download_files, normalize_count
 from redbook.redbook import (
     get_note,
     get_note_short_url,
-    get_user, get_user_notes
+    get_user, get_user_notes,
+    parse_note
 )
 
 database = PostgresqlExtDatabase(
@@ -267,6 +268,7 @@ class UserConfig(BaseModel):
         note_time_order, note_ids = [], []
         async for note_info in self.page():
             sticky = note_info.pop('sticky')
+            cached = Cache.get_or_none(id=note_info['id'])
             if note := Note.get_or_none(id=note_info['id']):
                 if not note.short_url:
                     note.xsec_token = note_info['xsec_token']
@@ -275,7 +277,7 @@ class UserConfig(BaseModel):
                     console.log(note.short_url)
                     note.save()
                 assert note.xsec_token
-                if note.time < since:
+                if note.time < since and (cached or not self.is_caching):
                     if sticky:
                         console.log("略过置顶笔记...")
                         continue
@@ -288,7 +290,8 @@ class UserConfig(BaseModel):
                         break
 
             note = await Note.from_id(note_info['id'],
-                                      xsec_token=note_info['xsec_token'])
+                                      xsec_token=note_info['xsec_token'],
+                                      update=not cached)
             if note.time < since:
                 console.log(
                     f'find note {note.id} before {since:%y-%m-%d} '
@@ -323,16 +326,42 @@ class UserConfig(BaseModel):
         if note_time_order:
             console.log(f'{len(note_time_order)} notes fetched')
             assert sorted(note_time_order, reverse=True) == note_time_order
-        if not self.note_fetch_at and not self.is_caching:
-            for note in self.user.notes.where(Note.id.not_in(note_ids)):
-                console.log(f'find invisible note {note.id}', style='notice')
-                medias = list(note.medias(download_dir))
-                console.log(note)
-                console.log(
-                    f"Downloading {len(medias)} files to {download_dir}..")
-                console.print()
-                for media in medias:
-                    yield media
+        if self.is_caching:
+            return
+        query = self.user.notes.where(
+            Note.id.not_in(note_ids)).where(Note.time > since)
+        for note in query:
+            console.log(f'find invisible note {note.id}', style='notice')
+            medias = list(note.medias(download_dir))
+            console.log(note)
+            console.log(
+                f"Downloading {len(medias)} files to {download_dir}..")
+            console.print()
+            for media in medias:
+                yield media
+
+
+class Cache(BaseModel):
+    id = TextField(primary_key=True, unique=True)
+    xsec_token = TextField()
+    note_info = JSONField()
+    added_at = DateTimeTZField()
+    updated_at = DateTimeTZField(null=True)
+
+    @classmethod
+    def upsert(cls, note_info: dict) -> Self:
+        note = parse_note(note_info)
+        d = dict(id=(id := note['id']),
+                 xsec_token=note['xsec_token'],
+                 note_info=note_info)
+        if cache := cls.get_or_none(id=id):
+            d['updated_at'] = pendulum.now()
+            update_model_from_dict(cache, d)
+            cache.save()
+        else:
+            d['added_at'] = pendulum.now()
+            cls.insert(d).execute()
+        return cls.get_by_id(id)
 
 
 class Note(BaseModel):
@@ -364,29 +393,33 @@ class Note(BaseModel):
     short_url = TextField(null=True)
 
     @classmethod
-    async def from_id(cls, note_id, update=None, xsec_token=None) -> Self:
-        note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
-        if (note := cls.get_or_none(id=note_id)) and not update:
+    async def from_id(cls, note_id, update: bool = False, xsec_token: str = '') -> Self:
+        note = cls.get_or_none(id=note_id)
+        if update or not note:
+            note_info = await get_note(note_id, xsec_token or note.xsec_token)
+            cache = Cache.upsert(note_info)
+        elif cache := Cache.get_or_none(id=note_id):
+            note_info = cache.note_info
+        else:
             return note
-        if note:
-            xsec_token = note.xsec_token
-        note_dict = await get_note(note_id, xsec_token)
+        note_dict = parse_note(note_info)
         note_dict = {k: v for k, v in note_dict.items() if v != []}
         user: User = User.get_by_id(note_dict['user_id'])
         assert note_dict.pop('avatar') == user.avatar
         assert note_dict.pop('nickname') == user.nickname
         assert note_dict['following'] == user.following
         note_dict['username'] = user.username
+        assert 'added_at' not in note_dict
+        assert 'updated_at' not in note_dict
+        note_dict['updated_at'] = cache.updated_at or cache.added_at
         await cls.upsert(note_dict)
         return cls.get_by_id(note_id)
 
     @classmethod
     async def upsert(cls, note_dict):
         note_id = note_dict['id']
-        assert 'added_at' not in note_dict
-        assert 'updated_at' not in note_dict
         if not (model := cls.get_or_none(id=note_id)):
-            note_dict['added_at'] = pendulum.now()
+            note_dict['added_at'] = note_dict.pop('updated_at')
             assert 'short_url' not in note_dict
             note_dict['short_url'] = short = await get_note_short_url(
                 note_id, note_dict['xsec_token'])
@@ -396,9 +429,6 @@ class Note(BaseModel):
                 console.log(
                     f'{short} insert to database failed', style='error')
                 raise
-
-        else:
-            note_dict['updated_at'] = pendulum.now()
         model_dict = model_to_dict(model, recurse=False)
         model_dict['user_id'] = model_dict.pop('user')
 
@@ -541,4 +571,4 @@ class Artist(BaseModel):
 
 
 database.create_tables(
-    [User, UserConfig, Note, Artist])
+    [User, UserConfig, Note, Artist, Cache])

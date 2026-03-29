@@ -145,7 +145,7 @@ async def get_note_short_url(note_id: str, xsec_token: str) -> dict:
     return f'https://{short_url}'
 
 
-async def get_note(note_id, xsec_token='', parse=True):
+async def get_note(note_id, xsec_token=''):
     if note_id.startswith('https://www.xiaohongshu.com/explore/'):
         url = furl(note_id)
         note_id = url.path.segments[-1]
@@ -175,11 +175,7 @@ async def get_note(note_id, xsec_token='', parse=True):
     note['url'] = f'https://www.xiaohongshu.com/explore/{note_id}?xsec_token={xsec_token}&xsec_source=pc_user'
     note['xsec_token'] = xsec_token
     assert item == {'id': note_id, 'model_type': 'note'}
-    try:
-        return parse_note(note) if parse else note
-    except AssertionError:
-        console.log(note['url'], style='error')
-        raise
+    return note
 
 
 def parse_video_url(url):
