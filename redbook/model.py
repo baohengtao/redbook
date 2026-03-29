@@ -348,8 +348,8 @@ class Note(BaseModel):
     at_user = JSONField(null=True)
     topics = ArrayField(field_class=TextField, null=True)
     url = TextField()
-    comment_count = IntegerField()
-    share_count = IntegerField()
+    comment_count = IntegerField(default=0)
+    share_count = IntegerField(default=0)
     liked = BooleanField()
     liked_count = IntegerField()
     collected = BooleanField()
@@ -388,9 +388,15 @@ class Note(BaseModel):
         if not (model := cls.get_or_none(id=note_id)):
             note_dict['added_at'] = pendulum.now()
             assert 'short_url' not in note_dict
-            note_dict['short_url'] = await get_note_short_url(
+            note_dict['short_url'] = short = await get_note_short_url(
                 note_id, note_dict['xsec_token'])
-            return cls.insert(note_dict).execute()
+            try:
+                return cls.insert(note_dict).execute()
+            except:
+                console.log(
+                    f'{short} insert to database failed', style='error')
+                raise
+
         else:
             note_dict['updated_at'] = pendulum.now()
         model_dict = model_to_dict(model, recurse=False)

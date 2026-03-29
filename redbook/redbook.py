@@ -199,6 +199,7 @@ def parse_note(note):
         assert note | value == value | note
         note |= value
     note.pop('illegal_info', None)
+    note.pop('live', None)  # 直播信息
 
     for k in note:
         if 'count' in k:
@@ -256,7 +257,7 @@ def parse_note(note):
         *pic_pre, pic_id_pre = pic_pre.split('!')[0].split('/')
         assert pic_id == pic_id_pre
         if (prefix := pic[-1]) in [
-                'spectrum', 'notes_pre_post', 'note_pre_post_uhdr']:
+                'spectrum', 'notes_pre_post', 'note_pre_post_uhdr', 'notes_uhdr']:
             assert pic_pre[-1] == pic[-1]
             pic_id = f'{prefix}/{pic_id}'
         pic = f'http://sns-img-hw.xhscdn.com/{pic_id}?imageView2/2/w/100000/format/jpg'
