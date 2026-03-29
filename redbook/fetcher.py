@@ -16,6 +16,8 @@ from redbook.helper import client
 httpx_logger = logging.getLogger("httpx")
 httpx_logger.disabled = True
 
+BASE_URL = 'https://edith.xiaohongshu.com'
+
 
 class Fetcher:
     def __init__(self) -> None:
@@ -27,8 +29,7 @@ class Fetcher:
 
     async def login(self):
         while True:
-            r = await self.get('https://edith.xiaohongshu.com',
-                               api='/api/sns/web/v2/user/me')
+            r = await self.get(BASE_URL+'/api/sns/web/v2/user/me')
             js = r.json()
             if js.pop('success'):
                 return js["data"]["nickname"]
@@ -73,21 +74,19 @@ class Fetcher:
         else:
             raise ConnectionError('request failed')
 
-    async def get(self, url, api='') -> Response:
-        url += api
-        headers = await self._get_xs(api)
-        return await self.request('Get', url, headers=headers)
+    async def get(self, url, params='') -> Response:
+        headers = await self._get_xs_v2(url, params, 'GET')
+        return await self.request('Get', url, headers=headers, params=params)
 
-    async def post(self, url, api, data: dict) -> Response:
-        headers = await self._get_xs(api, data)
+    async def post(self, url, data: dict) -> Response:
         data = json.dumps(data, separators=(',', ':'))
-        url += api
+        headers = await self._get_xs_v2(url, data, method='POST')
         return await self.request('Post', url, headers=headers, data=data)
 
-    async def _get_xs(self, api, data=''):
+    async def _get_xs_v2(self, url: str, data: str | dict, method: str):
         while True:
             try:
-                return await self.xs_getter.get_header(api, data)
+                return await self.xs_getter.get_header_v2(url, data, method)
             except Exception as e:
                 console.log(f'{e!r}: recreate xs_getter...', style='error')
                 await self.xs_getter.aclose()

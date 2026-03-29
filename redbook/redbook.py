@@ -9,7 +9,7 @@ from camel_converter import dict_to_snake
 from furl import furl
 
 from redbook import console
-from redbook.fetcher import fetcher
+from redbook.fetcher import BASE_URL, fetcher
 from redbook.helper import convert_js_dict_to_py, normalize_count
 
 
@@ -124,10 +124,10 @@ async def get_user_notes(user_id: str) -> AsyncIterator[dict]:
     for page in itertools.count(start=1):
         console.log(f'fetching page {page}...')
         # don't change this, or you will be detected by xhs server
-        api = ("/api/sns/web/v1/user_posted?num=30&image_formats=jpg,webp,avif"
-               f"&cursor={cursor}&user_id={user_id}&xsec_token=&xsec_source=")
-        url = 'https://edith.xiaohongshu.com'
-        js = (await fetcher.get(url=url, api=api)).json()
+        params = ("num=30&image_formats=jpg,webp,avif"
+                  f"&cursor={cursor}&user_id={user_id}&xsec_token=&xsec_source=pc_feed")
+        url = BASE_URL + "/api/sns/web/v1/user_posted"
+        js = (await fetcher.get(url=url, params=params)).json()
         data = js.pop('data')
         assert js == {'success': True, 'msg': '成功', 'code': 0}
 
@@ -148,30 +148,11 @@ async def get_user_notes(user_id: str) -> AsyncIterator[dict]:
         assert cursor
 
 
-async def get_note_from_web(note_id, params: str = '', parse=True):
-    note_id = note_id.removeprefix("https://www.xiaohongshu.com/explore/")
-    r = await fetcher.get(f'https://www.xiaohongshu.com/explore/{note_id}{params}')
-    info = re.findall(
-        r'<script>window.__INITIAL_STATE__=(.*?)</script>', r.text)[0]
-    note = convert_js_dict_to_py(info)['note']['noteDetailMap']
-    k, v = note.popitem()
-    assert not note
-    note = v.pop('note')
-    note = dict_to_snake(note)
-    note['url'] = f'https://www.xiaohongshu.com/explore/{note_id}'
-    try:
-        return parse_note(note) if parse else note
-    except AssertionError:
-        console.log(note['url'], style='error')
-        raise
-
-
 async def get_note_short_url(note_id: str, xsec_token: str) -> dict:
     assert xsec_token
     data = dict(original_url="https://www.xiaohongshu.com/discovery/item/"
                 f"{note_id}?xsec_token={xsec_token}&xsec_source=pc_user")
-    r = await fetcher.post(
-        'https://edith.xiaohongshu.com', '/api/sns/web/short_url', data=data)
+    r = await fetcher.post(BASE_URL+'/api/sns/web/short_url', data=data)
     short_url: str = r.json()['data']['short_url']
     assert short_url.startswith('xhslink.com')
     return f'https://{short_url}'
@@ -190,8 +171,7 @@ async def get_note(note_id, xsec_token=None, parse=True):
                  'xsec_source': 'pc_user',
                  }
     for _ in range(3):
-        r = await fetcher.post('https://edith.xiaohongshu.com',
-                               '/api/sns/web/v1/feed', note_data)
+        r = await fetcher.post(BASE_URL+'/api/sns/web/v1/feed', note_data)
         js = r.json()
         data = js.pop('data')
         if js == {'code': 0, 'success': True, 'msg': '成功'}:

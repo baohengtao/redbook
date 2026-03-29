@@ -11,7 +11,7 @@ from playwright.async_api import (
 )
 
 from redbook import console
-from redbook.client.help import sign
+from redbook.client.playwright_sign import sign_with_playwright
 
 
 class GetXS:
@@ -24,9 +24,9 @@ class GetXS:
             self.client = await get_client(self.cookies)
         return self.client
 
-    async def get_header(self, api, data=''):
+    async def get_header_v2(self, url: str, data: str | dict, method: str):
         await self.init_client()
-        xs = (await self.client._pre_headers(api, data)) if api else {}
+        xs = await self.client._pre_headers_v2(url, data, method)
         return self.client.headers | xs
 
     async def aclose(self):
@@ -74,27 +74,34 @@ class XiaoHongShuClient:
                  browser_context: BrowserContext):
         cookie_str, cookie_dict = convert_cookies(cookies)
         self.headers = {
-            "User-Agent":  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.79 Safari/537.36",
             "Cookie": cookie_str,
-            "Origin": "https://www.xiaohongshu.com",
-            "Referer": "https://www.xiaohongshu.com",
-            "Content-Type": "application/json;charset=UTF-8"
-        }
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "zh-CN,zh;q=0.9",
+            "cache-control": "no-cache",
+            "content-type": "application/json;charset=UTF-8",
+            "origin": "https://www.xiaohongshu.com",
+            "pragma": "no-cache",
+            "priority": "u=1, i",
+            "referer": "https://www.xiaohongshu.com/",
+            "sec-ch-ua": '"Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-site",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36", }
         self.playwright_page = playwright_page
         self.cookie_dict = cookie_dict
         self.browser_context = browser_context
         self.browser = browser
 
-    async def _pre_headers(self, api: str, data=None) -> dict:
-        encrypt_params = await self.playwright_page.evaluate(
-            "([url, data]) => window._webmsxyw(url,data)", [api, data])
-        local_storage = await self.playwright_page.evaluate(
-            "()=>window.localStorage")
-        signs = sign(
+    async def _pre_headers_v2(self, url: str, data: str | dict, method: str) -> dict:
+        signs = await sign_with_playwright(
+            uri=url,
+            data=data,
+            method=method,
             a1=self.cookie_dict.get("a1", ""),
-            b1=local_storage.get("b1", ""),
-            x_s=encrypt_params.get("X-s", ""),
-            x_t=str(encrypt_params.get("X-t", ""))
+            page=self.playwright_page,
         )
         return {
             "X-S": signs["x-s"],
@@ -102,16 +109,6 @@ class XiaoHongShuClient:
             "x-S-Common": signs["x-s-common"],
             "X-B3-Traceid": signs["x-b3-traceid"]
         }
-
-    async def get(self, url: str, api=''):
-        xs = (await self._pre_headers(api)) if api else {}
-        return requests.get(url=f"{url}{api}", headers=self.headers | xs)
-
-    async def post(self, url: str, api: str, data: dict):
-        headers = await self._pre_headers(api, data)
-        json_str = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
-        return requests.post(
-            url=f"{url}{api}", data=json_str, headers=headers)
 
     async def login(self, cookies: SimpleCookie):
         for key, morsel in cookies.items():
