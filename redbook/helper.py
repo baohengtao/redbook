@@ -190,8 +190,7 @@ def logsaver_decorator(func):
         try:
             return func(*args, **kwargs)
         except Exception:
-            with console.capture():
-                console.print_exception(show_locals=True)
+            console.print_exception(show_locals=True)
             raise
         finally:
             callargs = signature(func).bind(*args, **kwargs).arguments
@@ -212,9 +211,14 @@ def save_log(func_name, download_dir):
     from rich.terminal_theme import MONOKAI
     download_dir.mkdir(parents=True, exist_ok=True)
     time_format = pendulum.now().format('YY-MM-DD_HHmmss')
-    log_file = f"{func_name}_{time_format}.html"
-    console.log(f'Saving log to {download_dir / log_file}')
-    console.save_html(download_dir / log_file, theme=MONOKAI)
+    log_file = download_dir/f"{func_name}_{time_format}.html"
+    console.log(f'Saving log to {log_file}')
+    console.save_html(log_file, theme=MONOKAI)
+    html_text = log_file.read_text().replace(
+        "<pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">",
+        "<pre style=\"font-family:Monaco, monospace; font-size:14px\">"
+    )
+    log_file.write_text(html_text)
 
 
 def normalize_count(amount):

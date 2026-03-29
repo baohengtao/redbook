@@ -21,7 +21,7 @@ from redbook.helper import (
 )
 from redbook.model import Note, User, UserConfig
 
-app = Typer()
+app = Typer(pretty_exceptions_show_locals=False)
 
 
 def run_async(func):
