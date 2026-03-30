@@ -139,11 +139,8 @@ async def get_user_notes(user_id: str, xsec_token: str = '', xsec_source: str = 
         assert cursor
 
 
-async def get_note_short_url(note_id: str, xsec_token: str) -> dict:
-    assert xsec_token
-    data = dict(original_url="https://www.xiaohongshu.com/discovery/item/"
-                f"{note_id}?xsec_token={xsec_token}&xsec_source=pc_user")
-    r = await fetcher.post('/api/sns/web/short_url', data=data)
+async def shorten_url(url: str) -> str:
+    r = await fetcher.post('/api/sns/web/short_url', data={'original_url': url})
     short_url: str = r.json()['data']['short_url']
     assert short_url.startswith('xhslink.com')
     return f'https://{short_url}'

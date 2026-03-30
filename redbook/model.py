@@ -22,10 +22,9 @@ from redbook import console
 from redbook.exception import UserNotFoundError
 from redbook.helper import download_files, normalize_count
 from redbook.redbook import (
-    get_note,
-    get_note_short_url,
-    get_user, get_user_notes,
-    parse_note
+    get_note, get_user,
+    get_user_notes,
+    parse_note, shorten_url
 )
 
 database = PostgresqlExtDatabase(
@@ -77,6 +76,7 @@ class User(BaseModel):
     age = CharField(null=True)
     description = TextField(null=True)
     homepage = TextField()
+    short_url = TextField()
     following = BooleanField()
     location = CharField(null=True)
     ip_location = CharField(null=True)
@@ -117,11 +117,11 @@ class User(BaseModel):
                 console.log(model)
                 if not Confirm.ask('following status changed?'):
                     raise ValueError('following status changed!')
-            cls.upsert(user_dict)
+            await cls.upsert(user_dict)
         return cls.get_by_id(user_id)
 
     @classmethod
-    def upsert(cls, user_dict: dict):
+    async def upsert(cls, user_dict: dict):
         user_id = user_dict['id']
         if not (model := cls.get_or_none(id=user_id)):
             if not (username := cls.search_results.get(user_id)):
@@ -130,6 +130,8 @@ class User(BaseModel):
             user_dict['username'] = username
             return cls.insert(user_dict).execute()
         model_dict = model_to_dict(model)
+        if not (model and model.short_url):
+            user_dict['short_url'] = await shorten_url(user_dict['homepage'])
 
         for k, v in user_dict.items():
             assert v or v == 0
@@ -285,13 +287,6 @@ class UserConfig(BaseModel):
             sticky = note_info.pop('sticky')
             cached = Cache.get_or_none(id=note_info['id'])
             if note := Note.get_or_none(id=note_info['id']):
-                if not note.short_url:
-                    note.xsec_token = note_info['xsec_token']
-                    note.short_url = await get_note_short_url(
-                        note.id, note.xsec_token)
-                    console.log(note.short_url)
-                    note.save()
-                assert note.xsec_token
                 if note.time < since and (cached or not self.is_caching):
                     if sticky:
                         console.log("略过置顶笔记...")
@@ -439,8 +434,7 @@ class Note(BaseModel):
         if not (model := cls.get_or_none(id=note_id)):
             note_dict['added_at'] = note_dict.pop('updated_at')
             assert 'short_url' not in note_dict
-            note_dict['short_url'] = short = await get_note_short_url(
-                note_id, note_dict['xsec_token'])
+            note_dict['short_url'] = short = await shorten_url(note_dict['url'])
             try:
                 return cls.insert(note_dict).execute()
             except:
