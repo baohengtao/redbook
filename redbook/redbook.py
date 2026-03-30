@@ -7,6 +7,7 @@ import pendulum
 from furl import furl
 
 from redbook import console
+from redbook.exception import UserNotFoundError
 from redbook.fetcher import fetcher
 from redbook.helper import normalize_count
 
@@ -22,9 +23,11 @@ async def get_user(user_id: str, parse: bool = True) -> dict:
 
         assert 'id' not in user_info
         user_info['id'] = user_id
-
         assert 'homepage' not in user_info
         user_info['homepage'] = f"https://www.xiaohongshu.com/user/profile/{user_id}"
+        if status := user_info.get('user_account_status'):
+            assert status == {'type': 3, 'toast': '此账号已注销'}
+            raise UserNotFoundError(f'{user_info['homepage']} 此账号已注销')
         try:
             return _parse_user(user_info) if parse else user_info
         except ValueError as e:

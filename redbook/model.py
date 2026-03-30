@@ -19,6 +19,7 @@ from playhouse.shortcuts import model_to_dict, update_model_from_dict
 from rich.prompt import Confirm
 
 from redbook import console
+from redbook.exception import UserNotFoundError
 from redbook.helper import download_files, normalize_count
 from redbook.redbook import (
     get_note,
@@ -91,6 +92,7 @@ class User(BaseModel):
     avatar = TextField()
     added_at = DateTimeTZField(null=True, default=pendulum.now)
     redirect = TextField(null=True)
+    account_deleted = BooleanField(default=False)
     search_results = GirlSearch.get_search_results()['red']
 
     def __str__(slef):
@@ -100,14 +102,21 @@ class User(BaseModel):
     async def from_id(cls, user_id: str, update=False) -> Self:
         if not (model := cls.get_or_none(id=user_id)) or update:
             for _ in range(3):
-                user_dict = await get_user(user_id)
+                try:
+                    user_dict = await get_user(user_id)
+                except UserNotFoundError as e:
+                    console.log(e, style='error')
+                    if not model:
+                        raise
+                    model.account_deleted = True
+                    model.save()
+                    return model
                 if not model or user_dict['following'] == model.following:
                     break
             else:
                 console.log(model)
                 if not Confirm.ask('following status changed?'):
                     raise ValueError('following status changed!')
-
             cls.upsert(user_dict)
         return cls.get_by_id(user_id)
 
@@ -168,10 +177,17 @@ class UserConfig(BaseModel):
         user_dict['user_id'] = user_dict.pop('id')
         to_insert = {k: v for k, v in user_dict.items()
                      if k in cls._meta.columns}
-        if cls.get_or_none(user_id=user_id):
+        if config := cls.get_or_none(user_id=user_id):
             cls.update(to_insert).where(cls.user_id == user_id).execute()
         else:
             cls.insert(to_insert).execute()
+        if user.account_deleted:
+            console.log(config)
+            if not Confirm.ask(f'seems account deleted, disable fetch?'):
+                raise ValueError('账号已注销')
+            config.note_fetch = False
+            config.save()
+
         return cls.get(user_id=user_id)
 
     async def page(self) -> AsyncIterator[tuple[dict, str]]:
