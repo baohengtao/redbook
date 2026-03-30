@@ -20,7 +20,11 @@ from rich.prompt import Confirm
 
 from redbook import console
 from redbook.exception import UserNotFoundError
-from redbook.helper import download_files, normalize_count
+from redbook.helper import (
+    download_files,
+    download_single_file,
+    normalize_count
+)
 from redbook.redbook import (
     get_note, get_user,
     get_user_notes,
@@ -90,6 +94,7 @@ class User(BaseModel):
     verified_type = IntegerField(null=True)
     collection_public = BooleanField()
     avatar = TextField()
+    avatar_saved = BooleanField(default=False)
     added_at = DateTimeTZField(null=True, default=pendulum.now)
     redirect = TextField(null=True)
     account_deleted = BooleanField(default=False)
@@ -133,16 +138,52 @@ class User(BaseModel):
         if not (model and model.short_url):
             user_dict['short_url'] = await shorten_url(user_dict['homepage'])
 
-        for k, v in user_dict.items():
+        for k, v in user_dict.copy().items():
             assert v or v == 0
             if k in ['fans', 'follows', 'interaction']:
                 continue
             if v == model_dict[k]:
                 continue
+            if k == 'avatar':
+                console.log('avatar changed!', style='error')
+                assert model.avatar_saved is True
+                user_dict['avatar_saved'] = False
             console.log(f'+{k}: {v}', style='green bold on dark_green')
             if (ori := model_dict[k]) is not None:
                 console.log(f'-{k}: {ori}', style='red bold on dark_red')
         return cls.update(user_dict).where(cls.id == user_id).execute()
+
+    async def save_avatar(self, download_dir: Path):
+        assert self.short_url
+        aid = Path(self.avatar.split('?')[0].split('/')[-1])
+        aid = aid.with_suffix(aid.suffix or '.jpg')
+        filename = Path(f'{self.username}_{aid}')
+        xmp_info = {
+            "ImageSupplierID": self.id,
+            "ImageSupplierName": "RedBook",
+            "ImageCreatorName": self.username,
+            "BlogURL": self.short_url,
+            "BlogTitle": f'{self.username}的小红书头像',
+            "DateCreated": pendulum.now(),
+            "URLUrl": self.avatar
+        }
+        xmp_info["DateCreated"] = xmp_info["DateCreated"].strftime(
+            "%Y:%m:%d %H:%M:%S.%f").strip('0').strip('.')
+        xmp_info = {'XMP:'+k: v for k, v in xmp_info.items()}
+        console.log(f"save {self.username}'s avatar")
+        await download_single_file(
+            url=self.avatar,
+            filepath=download_dir/'avatar',
+            filename=filename,
+            xmp_info=xmp_info)
+        self.avatar_saved = True
+        self.save()
+
+    @classmethod
+    async def save_all_avatars(cls, download_dir):
+        for u in User.select().where(~User.avatar_saved):
+            u: User
+            await u.save_avatar(download_dir)
 
 
 class UserConfig(BaseModel):
@@ -193,7 +234,8 @@ class UserConfig(BaseModel):
 
     async def page(self) -> AsyncIterator[tuple[dict, str]]:
         async for note in get_user_notes(self.user_id):
-            assert note.pop('avatar') == self.user.avatar
+            assert note.pop('avatar') == self.user.avatar.split(
+                '?')[0].replace('sns-avatar-bak', 'sns-avatar-qc')
             assert note.pop('nick_name') == self.user.nickname
             assert note.pop('nickname') == self.user.nickname
             assert note.pop('user_id') == self.user_id
@@ -418,7 +460,8 @@ class Note(BaseModel):
         note_dict = parse_note(note_info)
         note_dict = {k: v for k, v in note_dict.items() if v != []}
         user: User = User.get_by_id(note_dict['user_id'])
-        assert note_dict.pop('avatar') == user.avatar
+        assert note_dict.pop('avatar') == user.avatar.split(
+            '?')[0].replace('sns-avatar-bak', 'sns-avatar-qc')
         assert note_dict.pop('nickname') == user.nickname
         assert note_dict['following'] == user.following
         note_dict['username'] = user.username

@@ -67,6 +67,9 @@ def _parse_user(user_info: dict) -> dict:
 
     avatar = user.pop('imageb').split('?')[0]
     assert avatar == user.pop('images').split('?')[0]
+    prefix, avatar_id = avatar.rsplit('/', maxsplit=1)
+    assert prefix == 'https://sns-avatar-qc.xhscdn.com/avatar'
+    avatar = f'https://sns-avatar-bak.xhscdn.com/avatar/{avatar_id}?imageView2/2/w/10000/format/jpg'
     assert avatar not in user
     user['avatar'] = avatar
 
