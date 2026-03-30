@@ -223,14 +223,12 @@ def save_log(func_name, download_dir):
 
 def normalize_count(amount):
     if amount and isinstance(amount, str):
+        amount = amount.removesuffix('+')
         num, mul = amount[:-1], amount[-1]
         match mul:
             case '亿':
                 amount = float(num) * (10 ** 8)
             case '万':
                 amount = float(num) * (10 ** 4)
-            case _:
-                if amount.isnumeric():
-                    amount = int(amount)
-
+        amount = int(amount)
     return amount

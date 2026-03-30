@@ -122,13 +122,10 @@ async def user_loop(frequency: float = 2,
             config = await UserConfig.from_id(user_id=config.user_id)
             is_new = config.note_fetch_at is None
             await config.fetch_note(download_dir)
-            if is_new:
-                logsaver.save_log(save_manually=True)
-                print_command()
-
-        logsaver.save_log()
+            logsaver.save_log(save_manually=is_new)
+            print_command()
         next_start_time = pendulum.now().add(hours=frequency)
-        console.rule(f'waiting for next fetching at {next_start_time:%H:%M:%S}',
+        console.rule(f'waiting for next fetching at {next_start_time:%Y-%m-%d %H:%M:%S}',
                      style='magenta on dark_magenta')
         console.log(
             "Press S to fetching immediately,\n"

@@ -1,4 +1,5 @@
 import itertools
+import re
 import time
 from copy import deepcopy
 from typing import AsyncIterator
@@ -85,9 +86,9 @@ def _parse_user(user_info: dict) -> dict:
     user['collection_public'] = user.pop('tab_public')['collection']
 
     assert 'verified' not in user
-    if verifyInfo := user.pop('verifyInfo', None):
-        user['verified_type'] = verifyInfo.pop('redOfficialVerifyType')
-        assert not verifyInfo
+    if verify_info := user.pop('verify_info', None):
+        user['verified_type'] = verify_info.pop('red_official_verify_type')
+        assert not verify_info
         user['verified'] = True
     else:
         user['verified'] = False
@@ -184,7 +185,8 @@ async def get_note(note_id, xsec_token=''):
 def parse_video_url(url):
     url = furl(url)
     if url.query:
-        assert url.host == 'sns-video-qc.xhscdn.com'
+        pattern = r"^sns-video-[a-z]{2}\.xhscdn\.com$"
+        assert re.match(pattern, url.host), url
         url.query = None
     url.host = 'sns-video-bd.xhscdn.com'
     return str(url)
@@ -221,17 +223,16 @@ def parse_note(note):
         note[k] = pendulum.from_timestamp(note[k]/1000, tz='local')
 
     tags = {(tag['name'], tag['type']) for tag in note.pop('tag_list')}
-    tag_types = {'topic', 'topic_page', 'location_page', 'vendor',
-                 'buyable_goods', 'goods', 'brand_page', 'brand',
-                 'interact_pk', 'interact_vote', 'moment', 'custom'}
-
+    tag_types = {'topic', 'topic_page', 'location', 'location_page', 'custom',
+                 'vendor', 'buyable_goods', 'goods', 'brand_page', 'brand',
+                 'interact_pk', 'interact_vote', 'moment'}
     if extra_types := ({t for _, t in tags} - tag_types):
         extra = {(n, t) for n, t in tags if t in extra_types}
         console.log(
             f'{note["url"]} find extra tag types {extra}', style='error')
     assert 'topics' not in note
     note['topics'] = sorted({n for n, t in tags if t in (
-        'topic', 'topic_page', 'custom', 'location_page')})
+        'topic', 'topic_page', 'custom', 'location_page', 'location')})
 
     assert 'at_user' not in note
     at_user_list = []
@@ -275,11 +276,28 @@ def parse_note(note):
     if 'video' in note:
         stream = note.pop('video').pop('media').pop('stream')
         stream = {k: v for k, v in stream.items() if v}
-        x = stream.pop('h264', None)
-        h264 = stream.pop('h265', None) or x
+
+        h264 = stream.pop('h264', {})
+        d264 = {d['height']: d['master_url'] for d in h264}
+        assert len(h264) == len(d264)
+
+        h265 = stream.pop('h265', {})
+        d265 = {d['height']: d['master_url'] for d in h265}
+        assert len(h265) == len(d265)
+
         assert not stream
-        assert len(h264) == 1
-        note['video'] = parse_video_url(h264[0]['master_url'])
+
+        if d264 and d265:
+            assert max(d265) >= max(d264)
+        else:
+            d265 = d265 or d264
+        if len(d265) > 1:
+            console.log(
+                f'multi video link found: {d265}, {max(d265)} is chosen')
+        note['video'] = parse_video_url(d265[max(d265)])
+    if audio := note.pop('audio_info', None):
+        assert 'audio' not in note
+        note['audio'] = audio
 
     for k in note:
         if isinstance(note[k], str):

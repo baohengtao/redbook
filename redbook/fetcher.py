@@ -61,12 +61,13 @@ class Fetcher:
                 console.log(f'{method} {url}  was cancelled.', style='error')
                 raise
             except HTTPError as e:
-                if isinstance(e, HTTPStatusError) and r.status_code in [461, 302]:
-                    console.log(r.text)
-                    input(f'{r.status_code} ERROR, verification needed...')
-                    continue
-                if r.status_code == 406:
-                    raise ValueError(f'Failed to fetch: {r.text}')
+                if isinstance(e, HTTPStatusError):
+                    if r.status_code in [461, 302]:
+                        console.log(r.text)
+                        input(f'{r.status_code} ERROR, verification needed...')
+                        continue
+                    elif r.status_code == 406:
+                        raise ValueError(f'Failed to fetch: {r.text}')
                 period = 30 * ((try_time % 10) or 30)
                 console.log(
                     f"{e!r}: failed on {try_time}th trys, sleeping {period} "

@@ -144,7 +144,6 @@ class User(BaseModel):
 
 
 class UserConfig(BaseModel):
-    # user: "User" = DeferredForeignKey("User", unique=True, backref='config')
     user = ForeignKeyField(User, backref="config")
     red_id = CharField(unique=True)
     username = CharField()
@@ -305,10 +304,11 @@ class UserConfig(BaseModel):
                             "获取完毕")
                         break
 
+            has_fetched = note
             note = await Note.from_id(note_info['id'],
                                       xsec_token=note_info['xsec_token'],
                                       update=not cached)
-            if note.time < since:
+            if note.time < since and not has_fetched:
                 console.log(
                     f'find note {note.id} before {since:%y-%m-%d} '
                     'but not fetched!', style='error')
@@ -331,6 +331,7 @@ class UserConfig(BaseModel):
             note_ids.append(note.id)
 
             medias = list(note.medias(save_path))
+            console.log(note.url, style=f"link {note.url}")
             console.log(note, '\n')
             if self.is_caching:
                 continue
@@ -396,13 +397,14 @@ class Note(BaseModel):
     comment_count = IntegerField(default=0)
     share_count = IntegerField(default=0)
     liked = BooleanField()
-    liked_count = IntegerField()
+    liked_count = IntegerField(default=0)
     collected = BooleanField()
-    collected_count = IntegerField()
+    collected_count = IntegerField(default=0)
     type = CharField()
     pic_ids = ArrayField(field_class=TextField)
     pics = ArrayField(field_class=TextField)
     video = TextField(null=True)
+    audio = JSONField(null=True)
     added_at = DateTimeTZField(null=True)
     updated_at = DateTimeTZField(null=True)
     xsec_token = TextField(null=True)
@@ -452,9 +454,17 @@ class Note(BaseModel):
             assert value or value == 0
             if (ori := model_dict[key]) == value:
                 continue
+            if key in ['xsec_token', 'url', 'updated_at',
+                       'liked_count', 'share_count',
+                       'comment_count', 'collected_count']:
+                continue
             if key in ['pic_ids', 'pics', 'video', 'video_md5']:
-                assert note_dict['last_update_time'] > model.last_update_time
-                raise ValueError(key)
+                assert note_dict['last_update_time'] >= model.last_update_time, (
+                    note_dict['last_update_time'], model.last_update_time)
+                if key in ['pics', 'pic_ids']:
+                    assert [v.split()[0].split('/')[-1]
+                            for v in value] == [v.split()[0].split('/')[-1] for v in ori]
+
             console.log(f'+{key}: {value}', style='green bold on dark_green')
             if ori is not None:
                 console.log(f'-{key}: {ori}', style='red bold on dark_red')
