@@ -21,7 +21,7 @@ from rich.prompt import Confirm
 from redbook import console
 from redbook.exception import UserNotFoundError
 from redbook.helper import (
-    download_files,
+    SAVE_PATH, download_files,
     download_single_file,
     normalize_count
 )
@@ -123,7 +123,9 @@ class User(BaseModel):
                 if not Confirm.ask('following status changed?'):
                     raise ValueError('following status changed!')
             await cls.upsert(user_dict)
-        return cls.get_by_id(user_id)
+        model = cls.get_by_id(user_id)
+        await model.save_avatar()
+        return model
 
     @classmethod
     async def upsert(cls, user_dict: dict):
@@ -153,7 +155,9 @@ class User(BaseModel):
                 console.log(f'-{k}: {ori}', style='red bold on dark_red')
         return cls.update(user_dict).where(cls.id == user_id).execute()
 
-    async def save_avatar(self, download_dir: Path):
+    async def save_avatar(self):
+        if self.avatar_saved:
+            return
         assert self.short_url
         aid = Path(self.avatar.split('?')[0].split('/')[-1])
         aid = aid.with_suffix(aid.suffix or '.jpg')
@@ -173,17 +177,17 @@ class User(BaseModel):
         console.log(f"save {self.username}'s avatar")
         await download_single_file(
             url=self.avatar,
-            filepath=download_dir/'avatar',
+            filepath=SAVE_PATH/'Avatar',
             filename=filename,
             xmp_info=xmp_info)
         self.avatar_saved = True
         self.save()
 
     @classmethod
-    async def save_all_avatars(cls, download_dir):
+    async def save_all_avatars(cls):
         for u in User.select().where(~User.avatar_saved):
             u: User
-            await u.save_avatar(download_dir)
+            await u.save_avatar()
 
 
 class UserConfig(BaseModel):

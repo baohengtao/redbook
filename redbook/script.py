@@ -13,7 +13,7 @@ from typer import Typer
 from redbook import console
 from redbook.fetcher import fetcher
 from redbook.helper import (
-    default_path,
+    SAVE_PATH,
     download_file_pair,
     logsaver_decorator,
     normalize_user_id,
@@ -72,7 +72,7 @@ async def note():
         if not (note := Note.get_or_none(id=note_id)):
             console.log(f'{note_id} not in database, skip...')
         tasks = [asyncio.create_task(download_file_pair(img))
-                 for img in note.medias(filepath=default_path)]
+                 for img in note.medias(filepath=SAVE_PATH)]
         await asyncio.gather(*tasks)
 
 
@@ -80,7 +80,7 @@ async def note():
 @logsaver_decorator
 @run_async
 async def user_loop(frequency: float = 2,
-                    download_dir: Path = default_path,
+                    download_dir: Path = SAVE_PATH,
                     ):
     console.log(f'current logined as: {await fetcher.login()}')
     logsaver = LogSaver('user_loop', download_dir)
@@ -157,7 +157,7 @@ async def user_loop(frequency: float = 2,
 @app.command(help='Add user to database of users whom we want to fetch from')
 @logsaver_decorator
 @run_async
-async def user(download_dir: Path = default_path):
+async def user(download_dir: Path = SAVE_PATH):
     """Add user to database of users whom we want to fetch from"""
     UserConfig.update_table()
     query = UserConfig.select().where(
@@ -197,7 +197,7 @@ async def user(download_dir: Path = default_path):
 
 
 @app.command()
-def write_meta(download_dir: Path = default_path):
+def write_meta(download_dir: Path = SAVE_PATH):
     from imgmeta.script import rename, write_meta
     for folder in ['User', 'New']:
         ori = download_dir / folder

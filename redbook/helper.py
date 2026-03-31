@@ -24,7 +24,7 @@ truststore.inject_into_ssl()
 
 if not (d := Path('/Volumes/Art')).exists():
     d = Path.home()/'Pictures'
-default_path = d / 'RedBook'
+SAVE_PATH = d / 'RedBook'
 semaphore = asyncio.Semaphore(10)
 client = httpx.AsyncClient()
 et = ExifToolHelper()
@@ -194,7 +194,7 @@ def logsaver_decorator(func):
             raise
         finally:
             callargs = signature(func).bind(*args, **kwargs).arguments
-            download_dir: Path = callargs.get('download_dir', default_path)
+            download_dir: Path = callargs.get('download_dir', SAVE_PATH)
             save_log(func.__name__, download_dir)
     return wrapper
 
