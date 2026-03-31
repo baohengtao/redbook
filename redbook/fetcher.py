@@ -1,13 +1,12 @@
 import asyncio
-import json
 import logging
-import pickle
 import random
 import time
-from http.cookies import SimpleCookie
 from pathlib import Path
 
 import httpx
+import keyring
+import pycookiecheat
 from httpx import HTTPError, HTTPStatusError, Response
 
 from redbook import console
@@ -19,37 +18,28 @@ httpx_logger.disabled = True
 BASE_URL = 'https://edith.xiaohongshu.com'
 
 
-def load_cookie() -> dict:
-    cookie_file = Path(__file__).with_name('cookie.pkl')
-    if cookie_file.exists():
-        cookies = pickle.loads(cookie_file.read_bytes())
-    else:
-        cookie_text = input('input cookie text...')
-        cookies = SimpleCookie()
-        cookies.load(cookie_text)
-        cookie_file.write_bytes(pickle.dumps(cookies))
-    cookies = {k: v.value for k, v in cookies.items()}
-    return cookies
+def get_dia_cookies(main_profile: bool = True, url='https://xiaohongshu.com') -> dict:
+    password = keyring.get_password('Dia Safe Storage', 'Dia')
+    cookie_path = Path.home()/'Library/Application Support/Dia/User Data/'
+    cookie_path /= f'Profile {5-main_profile}/Cookies'
+    return pycookiecheat.get_cookies(url, browser=pycookiecheat.BrowserType.CHROMIUM,
+                                     cookie_file=cookie_path, password=password)
 
 
 class Fetcher:
     def __init__(self) -> None:
-        self.cookies = load_cookie()
+        self.cookies = get_dia_cookies()
         self.client = httpx.AsyncClient(cookies=self.cookies)
         self._visit_count = 0
         self.visits = 0
         self._last_fetch = time.time()
 
     async def login(self):
-        while True:
-            r = await self.get('/api/sns/web/v2/user/me')
-            js = r.json()
-            if js.pop('success'):
-                return js["data"]["nickname"]
-            else:
-                console.log(js)
-            Path(__file__).with_name('cookie.pkl').unlink(missing_ok=True)
-            raise ValueError('not logined')
+        r = await self.get('/api/sns/web/v2/user/me')
+        js = r.json()
+        if js.pop('success'):
+            return js["data"]["nickname"]
+        raise ValueError(f'not logined: {js}', style='error')
 
     async def request(self, method, url, **kwargs) -> Response:
         for try_time in range(1, 20):
