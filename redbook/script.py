@@ -1,5 +1,6 @@
 import asyncio
 import itertools
+import random
 import select
 import sys
 import time
@@ -124,7 +125,7 @@ async def user_loop(frequency: float = 2,
             await config.fetch_note(download_dir)
             logsaver.save_log(save_manually=is_new)
             print_command()
-        next_start_time = pendulum.now().add(hours=frequency)
+        next_start_time = pendulum.now().add(hours=frequency*random.uniform(0.8, 1.2))
         console.rule(f'waiting for next fetching at {next_start_time:%Y-%m-%d %H:%M:%S}',
                      style='magenta on dark_magenta')
         console.log(

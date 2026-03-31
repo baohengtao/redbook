@@ -71,6 +71,10 @@ class BaseModel(Model):
     def get(cls, *query, **filters) -> Self:
         return super().get(*query, **filters)
 
+    @classmethod
+    def get_by_id(cls, *query, **filters) -> Self:
+        return super().get_by_id(*query, **filters)
+
 
 class User(BaseModel):
     id = TextField(primary_key=True, unique=True)

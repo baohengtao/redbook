@@ -25,7 +25,7 @@ async def get_user(user_id: str, parse: bool = True) -> dict:
         assert 'id' not in user_info
         user_info['id'] = user_id
         assert 'homepage' not in user_info
-        user_info['homepage'] = f"https://www.xiaohongshu.com/user/profile/{user_id}"
+        user_info['homepage'] = f"https://xiaohongshu.com/user/profile/{user_id}"
         if status := user_info.get('user_account_status'):
             assert status == {'type': 3, 'toast': '此账号已注销'}
             raise UserNotFoundError(f'{user_info['homepage']} 此账号已注销')
@@ -176,7 +176,7 @@ async def get_note(note_id, xsec_token=''):
     note = item.pop('note_card')
     assert 'url' not in note
     assert 'xsec_token' not in note
-    note['url'] = f'https://www.xiaohongshu.com/explore/{note_id}?xsec_token={xsec_token}&xsec_source=pc_user'
+    note['url'] = f'https://xiaohongshu.com/explore/{note_id}?xsec_token={xsec_token}&xsec_source=pc_user'
     note['xsec_token'] = xsec_token
     assert item == {'id': note_id, 'model_type': 'note'}
     return note
