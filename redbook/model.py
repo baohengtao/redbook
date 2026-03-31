@@ -334,6 +334,7 @@ class UserConfig(BaseModel):
             console.log(f'fetch notes from {since:%Y-%m-%d}\n')
         note_time_order, note_ids = [], []
         async for note_info in self.page():
+            update_xsec_token(note_info['id'], note_info['xsec_token'])
             sticky = note_info.pop('sticky')
             cached = Cache.get_or_none(id=note_info['id'])
             if note := Note.get_or_none(id=note_info['id']):
@@ -403,6 +404,18 @@ class UserConfig(BaseModel):
                 yield media
 
 
+def update_xsec_token(note_id, xsec_token):
+    url = f'https://xiaohongshu.com/explore/{note_id}?xsec_token={xsec_token}&xsec_source=pc_user'
+    if cache := Cache.get_or_none(id=note_id):
+        cache.xsec_token = xsec_token
+        cache.note_info |= {'url': url, 'xsec_token': xsec_token}
+        cache.save()
+    if note := Note.get_or_none(id=note_id):
+        note.xsec_token = xsec_token
+        note.url = url
+        note.save()
+
+
 class Cache(BaseModel):
     id = TextField(primary_key=True, unique=True)
     xsec_token = TextField()
@@ -453,7 +466,6 @@ class Note(BaseModel):
     added_at = DateTimeTZField(null=True)
     updated_at = DateTimeTZField(null=True)
     xsec_token = TextField(null=True)
-    short_url = TextField(null=True)
 
     @classmethod
     async def from_id(cls, note_id, update: bool = False, xsec_token: str = '') -> Self:
@@ -484,13 +496,13 @@ class Note(BaseModel):
         note_id = note_dict['id']
         if not (model := cls.get_or_none(id=note_id)):
             note_dict['added_at'] = note_dict.pop('updated_at')
-            assert 'short_url' not in note_dict
-            note_dict['short_url'] = short = await shorten_url(note_dict['url'])
             try:
                 return cls.insert(note_dict).execute()
             except:
+                url = note_dict['url']
+                console.log(url, style=f'link {url}')
                 console.log(
-                    f'{short} insert to database failed', style='error')
+                    f'{url} insert to database failed', style='error')
                 raise
         model_dict = model_to_dict(model, recurse=False)
         model_dict['user_id'] = model_dict.pop('user')
@@ -564,7 +576,7 @@ class Note(BaseModel):
             "ImageSupplierName": "RedBook",
             "ImageCreatorName": self.username,
             "BlogTitle": title.strip(),
-            "BlogURL": self.short_url or self.url,
+            "BlogURL": self.url,
             "DateCreated": (self.time +
                             pendulum.Duration(microseconds=int(sn or 0))),
             "SeriesNumber": sn,
