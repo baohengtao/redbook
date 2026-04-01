@@ -1,7 +1,10 @@
 import asyncio
 import json
 import mimetypes
+import re
 import sys
+from functools import wraps
+from inspect import signature
 from pathlib import Path
 from typing import AsyncIterable
 
@@ -17,11 +20,11 @@ from makelive.makelive import (
     add_asset_id_to_image_file,
     add_asset_id_to_quicktime_file
 )
+from rich.terminal_theme import MONOKAI
 
 from redbook import console
 
 truststore.inject_into_ssl()
-
 if not (d := Path('/Volumes/Art')).exists():
     d = Path.home()/'Pictures'
 SAVE_PATH = d / 'RedBook'
@@ -32,7 +35,6 @@ mime_detector = magic.Magic(mime=True)
 
 
 def normalize_user_id(user_id: str) -> str:
-    import re
     user_id = user_id.strip()
     user_id = user_id.split('?')[0]
     user_id = user_id.removeprefix('https://www.xiaohongshu.com/user/profile/')
@@ -111,7 +113,7 @@ async def download_single_file(
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188", }
     if img.suffix not in (suffixs := ['.mp4', '.mov']):
         suffixs = ['.webp', '.jpg', '.heic', '.png', '.heif']
-        assert img.suffix in suffixs
+        assert img.suffix in suffixs, img
     for suffix in suffixs:
         if (i := img.with_suffix(suffix)).exists():
             console.log(f'{i} already exists..skipping...', style='info')
@@ -181,9 +183,6 @@ def write_xmp(img: Path, tags: dict):
 
 
 def logsaver_decorator(func):
-    from functools import wraps
-    from inspect import signature
-
     """Decorator to save console log to html file"""
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -208,7 +207,6 @@ def print_command():
 
 
 def save_log(func_name, download_dir):
-    from rich.terminal_theme import MONOKAI
     download_dir.mkdir(parents=True, exist_ok=True)
     time_format = pendulum.now().format('YY-MM-DD_HHmmss')
     log_file = download_dir/f"{func_name}_{time_format}.html"

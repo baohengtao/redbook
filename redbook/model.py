@@ -104,7 +104,7 @@ class User(BaseModel):
     account_deleted = BooleanField(default=False)
     search_results = GirlSearch.get_search_results()['red']
 
-    def __str__(slef):
+    def __str__(self):
         return super().__repr__()
 
     @classmethod
@@ -217,7 +217,7 @@ class UserConfig(BaseModel):
     added_at = DateTimeTZField(null=True, default=pendulum.now)
     notes_count = IntegerField(default=0)
 
-    def __str__(slef):
+    def __str__(self):
         return super().__repr__()
 
     @classmethod
@@ -233,7 +233,7 @@ class UserConfig(BaseModel):
             cls.insert(to_insert).execute()
         if user.account_deleted:
             console.log(config)
-            if not Confirm.ask(f'seems account deleted, disable fetch?'):
+            if not Confirm.ask('seems account deleted, disable fetch?'):
                 raise ValueError('账号已注销')
             config.note_fetch = False
             config.save()
@@ -594,9 +594,6 @@ class Note(BaseModel):
         model.pop('pic_ids')
         return "\n".join(f'{k}: {v}' for k, v in model.items())
 
-    def __repr__(slef):
-        return super().__repr__()
-
 
 class Artist(BaseModel):
     user = ForeignKeyField(User, unique=True, backref='artist')
@@ -621,7 +618,7 @@ class Artist(BaseModel):
     class Meta:
         table_name = "artist"
 
-    def __str__(slef):
+    def __str__(self):
         return super().__repr__()
 
     @classmethod

@@ -56,8 +56,8 @@ class Fetcher:
                         console.log(r.text)
                         input(f'{r.status_code} ERROR, verification needed...')
                         continue
-                    elif r.status_code == 406:
-                        raise ValueError(f'Failed to fetch: {r.text}')
+                    if r.status_code == 406:
+                        raise ValueError(f'Failed to fetch: {r.text}') from e
                 period = 30 * ((try_time % 10) or 30)
                 console.log(
                     f"{e!r}: failed on {try_time}th trys, sleeping {period} "
@@ -66,8 +66,7 @@ class Fetcher:
                 await asyncio.sleep(period)
             else:
                 return r
-        else:
-            raise ConnectionError('request failed')
+        raise ConnectionError('request failed')
 
     async def get(self, api, params: dict = None) -> Response:
         splice_api = splice_str(api, params)
@@ -99,7 +98,7 @@ class Fetcher:
             sleep_time = 2
         sleep_time *= random.uniform(0.8, 1.2) * 4
         self._last_fetch += sleep_time
-        if (wait_time := (self._last_fetch-time.time())) > 0:
+        if (wait_time := self._last_fetch-time.time()) > 0:
             console.log(
                 f'sleep {wait_time:.1f} seconds...'
                 f'(count: {self._visit_count})',
@@ -117,9 +116,9 @@ class Fetcher:
         while time.time() < self._last_fetch:
             try:
                 await asyncio.sleep(0.1)
-            except asyncio.CancelledError:
+            except asyncio.CancelledError as e:
                 console.log('Cancelled on sleep', style='error')
-                raise KeyboardInterrupt
+                raise KeyboardInterrupt from e
         self._last_fetch = time.time()
         self._visit_count += 1
 

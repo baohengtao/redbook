@@ -85,7 +85,6 @@ async def user_loop(frequency: float = 2,
                     ):
     console.log(f'current logined as: {await fetcher.login()}')
     logsaver = LogSaver('user_loop', download_dir)
-    await User.save_all_avatars(download_dir)
     while True:
         print_command()
         UserConfig.update_table()

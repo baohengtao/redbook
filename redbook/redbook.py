@@ -110,7 +110,9 @@ def _parse_user(user_info: dict) -> dict:
     return user_sorted
 
 
-async def get_user_notes(user_id: str, xsec_token: str = '', xsec_source: str = '') -> AsyncIterator[dict]:
+async def get_user_notes(
+        user_id: str, xsec_token: str = '',
+        xsec_source: str = '') -> AsyncIterator[dict]:
     cursor = ''
     for page in itertools.count(start=1):
         console.log(f'fetching page {page}...')
