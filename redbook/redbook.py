@@ -187,7 +187,7 @@ async def get_note(note_id, xsec_token=''):
 def parse_video_url(url):
     url = furl(url)
     if url.query:
-        pattern = r"^sns-video-[a-z]{2}\.xhscdn\.com$"
+        pattern = r"^sns-video-[a-z0-9]{2}\.xhscdn\.com$"
         assert re.match(pattern, url.host), url
         url.query = None
     url.host = 'sns-video-bd.xhscdn.com'
