@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 import keyring
 import pycookiecheat
-from httpx import HTTPError, HTTPStatusError, Response
+from httpx import AsyncClient, HTTPError, HTTPStatusError, Response
 
 from redbook import console
 from redbook.client_v2.xhs_util import generate_headers, splice_str
@@ -28,11 +28,22 @@ def get_dia_cookies(main_profile: bool = True, url='https://xiaohongshu.com') ->
 
 class Fetcher:
     def __init__(self) -> None:
-        self.cookies = get_dia_cookies()
-        self.client = httpx.AsyncClient(cookies=self.cookies)
+        self.cookies: dict = None
+        self.client: AsyncClient = None
         self._visit_count = 0
         self.visits = 0
         self._last_fetch = time.time()
+
+    async def aclose(self) -> None:
+        if self.client:
+            await self.client.aclose()
+            self.client = None
+            self.cookies = None
+
+    def renew_client(self) -> None:
+        console.log('renewing client...')
+        self.cookies = get_dia_cookies()
+        self.client = httpx.AsyncClient(cookies=self.cookies)
 
     async def login(self):
         r = await self.get('/api/sns/web/v2/user/me')
@@ -42,6 +53,8 @@ class Fetcher:
         raise ValueError(f'not logined: {js}', style='error')
 
     async def request(self, method, url, **kwargs) -> Response:
+        if not self.client:
+            self.renew_client()
         for try_time in range(1, 20):
             try:
                 await self._pause()
@@ -78,6 +91,8 @@ class Fetcher:
         return await self.request('POST', BASE_URL+api, headers=headers, data=data)
 
     def get_headers(self, api: str, data: dict = None, method: str = 'POST'):
+        if not self.cookies:
+            self.renew_client()
         headers, data = generate_headers(self.cookies['a1'], api, data, method)
         return headers, data
 
