@@ -82,9 +82,9 @@ async def note():
 @app.command()
 @logsaver_decorator
 @run_async
-async def user_loop(frequency: float = 2,
-                    download_dir: Path = SAVE_PATH,
-                    ):
+async def user_loop(frequency: float = 6,
+                    limit: int = 4,
+                    download_dir: Path = SAVE_PATH):
     console.log(f'current logined as: {await fetcher.login()}')
     logsaver = LogSaver('user_loop', download_dir)
     while True:
@@ -100,23 +100,17 @@ async def user_loop(frequency: float = 2,
         if configs := query.where(UserConfig.note_fetch_at.is_null(True)):
             console.log(
                 f'total {configs.count()} new users found, fetching...')
-            limit = len(configs)
         elif ((configs := query.where(
                 UserConfig.note_next_fetch < pendulum.now()))
                 and (len(configs) >= 10)):
-            limit = len(configs)
             console.log(
                 f' {len(configs)} users satisfy fetching conditions, '
-                f'Fetching {limit} users whose estimated new notes is most')
+                'fetching users whose estimated new notes is most')
         else:
             configs = query.order_by(UserConfig.note_fetch_at)
-            if configs[0].note_fetch_at < pendulum.now().subtract(days=15):
-                limit = 20
-            else:
-                limit = 10
             console.log(
                 'no user satisfy fetching conditions, '
-                f'fetching {limit} users whose note_fetch_at is earliest.')
+                'fetching users whose note_fetch_at is earliest.')
         for i, config in enumerate(configs[:limit]):
             console.log(
                 f'fetching {i+1}/{limit}: {config.username} '
