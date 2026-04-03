@@ -498,7 +498,7 @@ class Note(BaseModel):
             note_dict['added_at'] = note_dict.pop('updated_at')
             try:
                 return cls.insert(note_dict).execute()
-            except:
+            except Exception:
                 url = note_dict['url']
                 console.log(url, style=f'link {url}')
                 console.log(

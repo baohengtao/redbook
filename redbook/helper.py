@@ -100,6 +100,9 @@ async def download_file_pair(medias: list[dict]):
     write_xmp(img_path, img_xmp)
     write_xmp(mov_path, mov_xmp)
 
+USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+              "Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188")
+
 
 async def download_single_file(
         url: str,
@@ -109,8 +112,7 @@ async def download_single_file(
 ) -> Path:
     filepath.mkdir(parents=True, exist_ok=True)
     img = filepath / filename
-    headers = {
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188", }
+    headers = {"user-agent": USER_AGENT}
     if img.suffix not in (suffixs := ['.mp4', '.mov']):
         suffixs = ['.webp', '.jpg', '.heic', '.png', '.heif']
         assert img.suffix in suffixs, img
