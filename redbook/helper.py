@@ -137,16 +137,13 @@ async def download_single_file(
             raise
 
         if r.status_code == 404:
-            console.log(
-                f"{url}, {xmp_info}, {r.status_code}", style="error")
-            return
-        elif r.status_code != 200:
+            raise ValueError(f"{url}, {xmp_info}, {r.status_code}")
+        if r.status_code != 200:
             console.log(
                 f"{url}, {r.status_code}, retrying download after 15 seconds",
                 style="error")
             await asyncio.sleep(15)
             continue
-
         if int(r.headers['Content-Length']) != len(r.content):
             console.log(f"expected length: {r.headers['Content-Length']}, "
                         f"actual length: {len(r.content)} for {img}",

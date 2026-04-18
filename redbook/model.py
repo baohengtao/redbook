@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import AsyncIterator, Iterator, Self
+from typing import AsyncGenerator, Iterator, Self
 
 import keyring
 import pendulum
@@ -240,7 +240,7 @@ class UserConfig(BaseModel):
 
         return cls.get(user_id=user_id)
 
-    async def page(self) -> AsyncIterator[tuple[dict, str]]:
+    async def page(self) -> AsyncGenerator[dict]:
         async for note in get_user_notes(self.user_id):
             assert note.pop('avatar') == self.user.avatar.split(
                 '?')[0].replace('sns-avatar-bak', 'sns-avatar-qc')
@@ -311,7 +311,7 @@ class UserConfig(BaseModel):
             self,
             download_root: Path,
             refetch=False,
-    ) -> AsyncIterator[dict]:
+    ) -> AsyncGenerator[list[dict]]:
         """
         Save weibo to database and return media info
         :return: generator of medias to downloads
@@ -342,13 +342,12 @@ class UserConfig(BaseModel):
                     if sticky:
                         console.log("略过置顶笔记...")
                         continue
-                    elif refetch or note.time > since.subtract(months=1):
+                    if refetch or note.time > since.subtract(months=1):
                         continue
-                    else:
-                        console.log(
-                            f"时间 {note.time:%y-%m-%d} 在 {since:%y-%m-%d}之前, "
-                            "获取完毕")
-                        break
+                    console.log(
+                        f"时间 {note.time:%y-%m-%d} 在 {since:%y-%m-%d}之前, "
+                        "获取完毕")
+                    break
 
             has_fetched = note
             note = await Note.from_id(note_info['id'],
@@ -367,7 +366,7 @@ class UserConfig(BaseModel):
             t = re.sub(r'\s|\n', '', note_info.pop('display_title'))
 
             if t not in display_topic + display_title + display_topic:
-                console.log(f"note_info['display_title] {t} not in "
+                console.log(f"note_info['display_title'] {t} not in "
                             f"{[note.title, note.desc]}", style='error')
             for k, v in note_info.items():
                 if getattr(note, k) != v:
@@ -527,7 +526,7 @@ class Note(BaseModel):
                 console.log(f'-{key}: {ori}', style='red bold on dark_red')
         return cls.update(note_dict).where(cls.id == note_id).execute()
 
-    def medias(self, filepath: Path = None) -> Iterator[dict]:
+    def medias(self, filepath: Path = None) -> Iterator[list[dict]]:
         prefix = f'{self.last_update_time:%y-%m-%d}_{self.username}_{self.id}'
         if self.video:
             yield [{

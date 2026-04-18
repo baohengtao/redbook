@@ -50,7 +50,7 @@ class Fetcher:
         js = r.json()
         if js.pop('success'):
             return js["data"]["nickname"]
-        raise ValueError(f'not logined: {js}', style='error')
+        raise ValueError(f'not logined: {js}')
 
     async def request(self, method, url, **kwargs) -> Response:
         if not self.client:
