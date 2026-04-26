@@ -2,12 +2,10 @@ import asyncio
 import logging
 import random
 import time
-from pathlib import Path
 
 import httpx
-import keyring
-import pycookiecheat
 from httpx import AsyncClient, HTTPError, HTTPStatusError, Response
+from toolkit.tool import get_arc_cookies
 
 from redbook import console
 from redbook.client_v2.xhs_util import generate_headers, splice_str
@@ -16,14 +14,6 @@ httpx_logger = logging.getLogger("httpx")
 httpx_logger.disabled = True
 
 BASE_URL = 'https://edith.xiaohongshu.com'
-
-
-def get_dia_cookies(main_profile: bool = True, url='https://xiaohongshu.com') -> dict:
-    password = keyring.get_password('Dia Safe Storage', 'Dia')
-    cookie_path = Path.home()/'Library/Application Support/Dia/User Data/'
-    cookie_path /= f'Profile {5-main_profile}/Cookies'
-    return pycookiecheat.get_cookies(url, browser=pycookiecheat.BrowserType.CHROMIUM,
-                                     cookie_file=cookie_path, password=password)
 
 
 class Fetcher:
@@ -42,7 +32,8 @@ class Fetcher:
 
     def renew_client(self) -> None:
         console.log('renewing client...')
-        self.cookies = get_dia_cookies()
+        self.cookies = get_arc_cookies(
+            'https://xiaohongshu.com', main_profile=True)
         self.client = httpx.AsyncClient(cookies=self.cookies)
 
     async def login(self):
