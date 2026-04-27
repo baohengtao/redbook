@@ -7,16 +7,16 @@ import keyring
 import pendulum
 from peewee import Model
 from photosinfo.model import GirlSearch
-from playhouse.postgres_ext import ArrayField, BooleanField, CharField
-from playhouse.postgres_ext import DateTimeTZField as RawDateTimeTZField
-from playhouse.postgres_ext import (
-    ForeignKeyField,
-    IntegerField, JSONField,
-    PostgresqlExtDatabase,
-    TextField
-)
+from playhouse.postgres_ext import PostgresqlExtDatabase
 from playhouse.shortcuts import model_to_dict, update_model_from_dict
 from rich.prompt import Confirm
+from toolkit.model import (
+    ArrayField, BooleanField,
+    DateTimeTZField,
+    ForeignKeyField,
+    IntegerField, JSONField,
+    TextField
+)
 
 from redbook import console
 from redbook.exception import UserNotFoundError
@@ -37,17 +37,6 @@ database = PostgresqlExtDatabase(
     sslmode="disable",
     gssencmode="disable",
     connect_timeout=3)
-try:
-    database.connect()
-except Exception as e:
-    raise ValueError('cannot connect to database') from e
-
-
-class DateTimeTZField(RawDateTimeTZField):
-    def python_value(self, value):
-        if value is not None:
-            return pendulum.instance(value)
-        return value
 
 
 class BaseModel(Model):
