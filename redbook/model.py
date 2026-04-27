@@ -305,6 +305,7 @@ class UserConfig(BaseModel):
         self.note_next_fetch = now.add(hours=self.post_cycle)
         if refetch:
             self.note_refetch_at = now
+        self.notes_count = self.user.notes.count()
         self.save()
 
     async def _save_notes(
@@ -511,7 +512,7 @@ class Note(BaseModel):
             if (ori := model_dict[key]) == value:
                 continue
             if key in ['xsec_token', 'url', 'updated_at',
-                       'liked_count', 'share_count',
+                       'following', 'liked_count', 'share_count',
                        'comment_count', 'collected_count']:
                 continue
             if key in ['pic_ids', 'pics', 'video', 'video_md5']:
@@ -529,16 +530,15 @@ class Note(BaseModel):
     def medias(self, filepath: Path = None) -> Iterator[list[dict]]:
         prefix = f'{self.last_update_time:%y-%m-%d}_{self.username}_{self.id}'
         if self.video:
-            yield [{
-                'url': self.video,
-                'filename': f'{prefix}.mp4',
-                'filepath': filepath,
-                'xmp_info': self.gen_meta(url=self.video),
-            }]
             if len(self.pics) == 1:
+                yield [{
+                    'url': self.video,
+                    'filename': f'{prefix}.mp4',
+                    'filepath': filepath,
+                    'xmp_info': self.gen_meta(url=self.video),
+                }]
                 return
-            else:
-                console.log('seems video is a set of imgs', style='error')
+            assert len(self.pics) > 1  # video is a set of imgs
         for sn, url in enumerate(self.pics, start=1):
             if ' ' not in url:
                 url += ' '
@@ -547,7 +547,7 @@ class Note(BaseModel):
             suffix = '.heic' if live else '.webp'
             meta = [{
                 'url': url.split('?')[0] if not live else url,
-                'filename': f'{prefix}{live_tag}_{sn}_img{suffix}',
+                'filename': f'{prefix}_{sn}{live_tag}_img{suffix}',
                 'filepath': filepath,
                 'xmp_info': self.gen_meta(sn=sn, url=url),
             }]

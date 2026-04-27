@@ -293,9 +293,6 @@ def parse_note(note):
             assert max(d265) >= max(d264)
         else:
             d265 = d265 or d264
-        if len(d265) > 1:
-            console.log(
-                f'multi video link found: {d265}, {max(d265)} is chosen')
         note['video'] = parse_video_url(d265[max(d265)])
     if audio := note.pop('audio_info', None):
         assert 'audio' not in note
