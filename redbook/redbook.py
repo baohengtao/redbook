@@ -203,6 +203,7 @@ def parse_note(note):
         note |= value
     note.pop('illegal_info', None)
     note.pop('live', None)  # 直播信息
+    note.pop('avatar')
 
     for k in note:
         if 'count' in k:

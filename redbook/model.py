@@ -480,8 +480,6 @@ class Note(BaseModel):
         note_dict = parse_note(note_info)
         note_dict = {k: v for k, v in note_dict.items() if v != []}
         user: User = User.get_by_id(note_dict['user_id'])
-        assert note_dict.pop('avatar') == user.avatar.split(
-            '?')[0].replace('sns-avatar-bak', 'sns-avatar-qc')
         assert note_dict.pop('nickname') == user.nickname
         assert note_dict['following'] == user.following
         note_dict['username'] = user.username
