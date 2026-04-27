@@ -82,8 +82,8 @@ async def note():
 @app.command()
 @logsaver_decorator
 @run_async
-async def user_loop(frequency: float = 6,
-                    limit: int = 4,
+async def user_loop(frequency: float = 4,
+                    limit: int = 6,
                     download_dir: Path = SAVE_PATH):
     console.log(f'current logined as: {await fetcher.login()}')
     logsaver = LogSaver('user_loop', download_dir)
@@ -115,11 +115,16 @@ async def user_loop(frequency: float = 6,
             console.log(
                 f'fetching {i+1}/{limit}: {config.username} '
                 f'(total: {len(configs)})')
+            visit = fetcher.visits
             config = await UserConfig.from_id(user_id=config.user_id)
             is_new = config.note_fetch_at is None
             await config.fetch_note(download_dir)
             logsaver.save_log(save_manually=is_new)
             print_command()
+            visit = fetcher.visits - visit
+            sleep_time = visit * 30
+            console.log(f'sleep {sleep_time} for {visit} visits')
+            await asyncio.sleep(sleep_time)
         await fetcher.aclose()
         next_start_time = pendulum.now().add(hours=frequency*random.uniform(0.8, 1.2))
         console.rule(f'waiting for next fetching at {next_start_time:%Y-%m-%d %H:%M:%S}',
