@@ -4,7 +4,6 @@ import mimetypes
 import re
 import sys
 from functools import wraps
-from inspect import signature
 from pathlib import Path
 from typing import AsyncIterable
 
@@ -20,7 +19,7 @@ from makelive.makelive import (
     add_asset_id_to_image_file,
     add_asset_id_to_quicktime_file
 )
-from rich.terminal_theme import MONOKAI
+from toolkit.record import save_log
 
 from redbook import console
 
@@ -191,9 +190,7 @@ def logsaver_decorator(func):
             console.print_exception(show_locals=True)
             raise
         finally:
-            callargs = signature(func).bind(*args, **kwargs).arguments
-            download_dir: Path = callargs.get('download_dir', SAVE_PATH)
-            save_log(func.__name__, download_dir)
+            save_log(func.__name__)
     return wrapper
 
 
@@ -203,19 +200,6 @@ def print_command():
     console.log(
         f" run command  @ {pendulum.now().format('YYYY-MM-DD HH:mm:ss')}")
     console.log(' '.join(argv))
-
-
-def save_log(func_name, download_dir):
-    download_dir.mkdir(parents=True, exist_ok=True)
-    time_format = pendulum.now().format('YY-MM-DD_HHmmss')
-    log_file = download_dir/f"{func_name}_{time_format}.html"
-    console.log(f'Saving log to {log_file}')
-    console.save_html(log_file, theme=MONOKAI)
-    html_text = log_file.read_text().replace(
-        "<pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">",
-        "<pre style=\"font-family:Monaco, monospace; font-size:14px\">"
-    )
-    log_file.write_text(html_text)
 
 
 def normalize_count(amount):

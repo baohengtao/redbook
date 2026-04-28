@@ -41,9 +41,8 @@ SAVE_LOG_FOR_COUNT = 200
 
 
 class LogSaver:
-    def __init__(self, command: str, download_dir: Path):
+    def __init__(self, command: str):
         self.command = command
-        self.download_dir = download_dir
         self.save_log_at = pendulum.now()
         self.save_visits_at = fetcher.visits
 
@@ -62,7 +61,7 @@ class LogSaver:
             console.log('Saving log manually...')
         else:
             return
-        save_log(self.command, self.download_dir)
+        save_log(self.command)
         self.save_log_at = pendulum.now()
         self.save_visits_at = fetcher.visits
 
@@ -86,7 +85,7 @@ async def user_loop(frequency: float = 4,
                     limit: int = 6,
                     download_dir: Path = SAVE_PATH):
     console.log(f'current logined as: {await fetcher.login()}')
-    logsaver = LogSaver('user_loop', download_dir)
+    logsaver = LogSaver('user_loop')
     while True:
         print_command()
         UserConfig.update_table()
