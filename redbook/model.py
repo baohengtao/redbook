@@ -230,7 +230,7 @@ class UserConfig(BaseModel):
                 config.post_cycle = config.get_post_cycle()
                 config.note_next_fetch = (
                     config.note_fetch_at +
-                    pendulum.Duration(hours=config.post_cycle))
+                    pendulum.Duration(hours=2*config.post_cycle))
             config.save()
 
     async def fetch_note(self, download_dir: Path):
@@ -258,7 +258,7 @@ class UserConfig(BaseModel):
         if notes := self.user.notes.order_by(Note.time.desc()):
             self.post_at = notes.first().time
         self.post_cycle = self.get_post_cycle()
-        self.note_next_fetch = now.add(hours=self.post_cycle)
+        self.note_next_fetch = now.add(hours=2*self.post_cycle)
         if refetch:
             self.note_refetch_at = now
         self.notes_count = self.user.notes.count()
@@ -270,7 +270,7 @@ class UserConfig(BaseModel):
             refetch=False,
     ) -> AsyncGenerator[list[dict]]:
         """
-        Save weibo to database and return media info
+        Save note to database and return media info
         :return: generator of medias to downloads
         """
 
@@ -307,9 +307,10 @@ class UserConfig(BaseModel):
                     break
 
             has_fetched = note
-            note = await Note.from_id(note_info['id'],
-                                      xsec_token=note_info['xsec_token'],
-                                      update=not cached)
+            note = await Note.from_id(
+                note_info['id'],
+                xsec_token=note_info['xsec_token'],
+                update=not cached)
             if note.time < since and not has_fetched:
                 console.log(
                     f'find note {note.id} before {since:%y-%m-%d} '
@@ -381,10 +382,9 @@ class Cache(BaseModel):
 
     @classmethod
     def upsert(cls, note_info: dict) -> Self:
-        note = parse_note(note_info)
-        d = dict(id=(id := note['id']),
-                 xsec_token=note['xsec_token'],
-                 note_info=note_info)
+        d = {'id': (id := note_info['note_id']),
+             'xsec_token': note_info['xsec_token'],
+             'note_info': note_info}
         if cache := cls.get_or_none(id=id):
             d['updated_at'] = pendulum.now()
             update_model_from_dict(cache, d)
@@ -393,6 +393,9 @@ class Cache(BaseModel):
             d['added_at'] = pendulum.now()
             cls.insert(d).execute()
         return cls.get_by_id(id)
+
+    def parse(self) -> dict:
+        return parse_note(self.note_info)
 
 
 class Note(BaseModel):
@@ -426,10 +429,11 @@ class Note(BaseModel):
     @classmethod
     async def from_id(cls, note_id, update: bool = False, xsec_token: str = '') -> Self:
         note = cls.get_or_none(id=note_id)
-        if update or not note:
+        cache = Cache.get_or_none(id=note_id)
+        if update or not (note or cache):
             note_info = await get_note(note_id, xsec_token or note.xsec_token)
             cache = Cache.upsert(note_info)
-        elif cache := Cache.get_or_none(id=note_id):
+        elif cache:
             note_info = cache.note_info
         else:
             return note
@@ -472,9 +476,9 @@ class Note(BaseModel):
             if key in ['pic_ids', 'pics', 'video', 'video_md5']:
                 assert note_dict['last_update_time'] >= model.last_update_time, (
                     note_dict['last_update_time'], model.last_update_time)
-                if key in ['pics', 'pic_ids']:
-                    assert [v.split()[0].split('/')[-1]
-                            for v in value] == [v.split()[0].split('/')[-1] for v in ori]
+            if key in ['pics', 'pic_ids']:
+                assert set(v.split()[0].split('/')[-1]
+                           for v in value) == set(v.split()[0].split('/')[-1] for v in ori)
 
             console.log(f'+{key}: {value}', style='green bold on dark_green')
             if ori is not None:
@@ -546,6 +550,9 @@ class Note(BaseModel):
         model.pop('pics')
         model.pop('pic_ids')
         return "\n".join(f'{k}: {v}' for k, v in model.items())
+
+    def __repr__(self):
+        return BaseModel.__repr__(self)
 
 
 class Artist(BaseModel):

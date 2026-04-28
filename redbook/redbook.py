@@ -151,7 +151,7 @@ async def shorten_url(url: str) -> str:
     return f'https://{short_url}'
 
 
-async def get_note(note_id, xsec_token=''):
+async def get_note(note_id: str, xsec_token: str = '') -> dict:
     if note_id.startswith('https://www.xiaohongshu.com/explore/'):
         url = furl(note_id)
         note_id = url.path.segments[-1]
@@ -184,7 +184,7 @@ async def get_note(note_id, xsec_token=''):
     return note
 
 
-def parse_video_url(url):
+def parse_video_url(url: str) -> str:
     url = furl(url)
     if url.query:
         pattern = r"^sns-video-[a-z0-9]{2}\.xhscdn\.com$"
@@ -194,7 +194,7 @@ def parse_video_url(url):
     return str(url)
 
 
-def parse_note(note):
+def parse_note(note: dict) -> dict:
     note = deepcopy(note)
     for key in ['user',  'share_info', 'interact_info']:
         value = note.pop(key)
@@ -281,17 +281,17 @@ def parse_note(note):
         stream = {k: v for k, v in stream.items() if v}
 
         h264 = stream.pop('h264', {})
-        d264 = {d['height']: d['master_url'] for d in h264}
+        d264 = {(d['height'], d['avg_bitrate']): d['master_url'] for d in h264}
         assert len(h264) == len(d264)
 
         h265 = stream.pop('h265', {})
-        d265 = {d['height']: d['master_url'] for d in h265}
+        d265 = {(d['height'], d['avg_bitrate']): d['master_url'] for d in h265}
         assert len(h265) == len(d265)
 
         assert not stream
 
         if d264 and d265:
-            assert max(d265) >= max(d264)
+            assert max(d265)[0] >= max(d264)[0]
         else:
             d265 = d265 or d264
         note['video'] = parse_video_url(d265[max(d265)])
