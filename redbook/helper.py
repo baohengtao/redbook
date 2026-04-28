@@ -61,7 +61,23 @@ def convert_js_dict_to_py(js_dict: str) -> dict:
 
 
 async def download_files(imgs: AsyncIterable[list[dict]]):
-    tasks = [asyncio.create_task(download_file_pair(img)) async for img in imgs]
+    tasks: dict[asyncio.Task, list] = {}
+    failed_tasks: dict[asyncio.Task, list] = {}
+    async for img in imgs:
+        task = asyncio.create_task(download_file_pair(img))
+        tasks[task] = img
+        for task in list(tasks):
+            if task.done():
+                img = tasks.pop(task)
+                if task.exception():
+                    failed_tasks[task] = img
+        if failed_tasks:
+            for task in list(tasks):
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            task, img = failed_tasks.popitem()
+            console.log(f'{img} failed')
+            raise task.exception()
     await asyncio.gather(*tasks)
 
 
