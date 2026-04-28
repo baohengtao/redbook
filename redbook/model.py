@@ -2,10 +2,8 @@ import re
 from pathlib import Path
 from typing import AsyncGenerator, Iterator, Self
 
-import keyring
 import pendulum
 from photosinfo.model import GirlSearch
-from playhouse.postgres_ext import PostgresqlExtDatabase
 from playhouse.shortcuts import model_to_dict, update_model_from_dict
 from rich.prompt import Confirm
 from toolkit.model import (
@@ -14,7 +12,7 @@ from toolkit.model import (
     DateTimeTZField,
     ForeignKeyField,
     IntegerField, JSONField,
-    TextField
+    TextField, get_database
 )
 
 from redbook import console
@@ -30,12 +28,7 @@ from redbook.redbook import (
     parse_note, shorten_url
 )
 
-database = PostgresqlExtDatabase(
-    'redbook', host='localhost',
-    password=keyring.get_password('postgresql', 'cooper'),
-    sslmode="disable",
-    gssencmode="disable",
-    connect_timeout=3)
+database = get_database('redbook')
 BaseModel.bind(database)
 
 
