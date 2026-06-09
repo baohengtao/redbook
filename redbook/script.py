@@ -83,7 +83,7 @@ async def note():
 @logsaver_decorator
 @run_async
 async def user_loop(frequency: float = 4,
-                    limit: int = 6,
+                    limit: int = 12,
                     download_dir: Path = SAVE_PATH):
     console.log(f'current logined as: {await fetcher.login()}')
     logsaver = LogSaver('user_loop')
@@ -91,26 +91,25 @@ async def user_loop(frequency: float = 4,
         print_command()
         UserConfig.update_table()
         post_count = ((time.time()-UserConfig.note_fetch_at.to_timestamp())
-                      / UserConfig.post_cycle).desc()
-
-        query = (UserConfig.select()
-                 .where(UserConfig.note_fetch)
-                 .order_by(post_count, UserConfig.id)
-                 )
+                      / 3600 / UserConfig.post_cycle)
+        query = (
+            UserConfig.select()
+            .where(UserConfig.note_fetch)
+            .order_by(post_count.desc(), UserConfig.id)
+        )
         if configs := query.where(UserConfig.note_fetch_at.is_null(True)):
             console.log(
                 f'total {configs.count()} new users found, fetching...')
-        elif ((configs := query.where(
-                UserConfig.note_next_fetch < pendulum.now()))
-                and (len(configs) >= 10)):
+        elif (configs := query.where(post_count > 4)) and len(configs) >= 10:
             console.log(
                 f' {len(configs)} users satisfy fetching conditions, '
                 'fetching users whose estimated new notes is most')
         else:
-            configs = query.order_by(UserConfig.note_fetch_at)
+            configs = query.order_by(UserConfig.note_fetch_at).limit(3)
             console.log(
                 'no user satisfy fetching conditions, '
                 'fetching users whose note_fetch_at is earliest.')
+        current_visits = fetcher.visits
         for i, config in enumerate(configs[:limit]):
             console.log(
                 f'fetching {i+1}/{limit}: {config.username} '
@@ -121,6 +120,9 @@ async def user_loop(frequency: float = 4,
             await config.fetch_note(download_dir)
             logsaver.save_log(save_manually=is_new)
             print_command()
+            if fetcher.visits > current_visits + 500:
+                console.log('break this loop since visits > 500')
+                break
             visit = fetcher.visits - visit
             sleep_time = visit * 30
             console.log(f'sleep {sleep_time} for {visit} visits')

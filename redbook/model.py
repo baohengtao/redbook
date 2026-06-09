@@ -158,7 +158,6 @@ class UserConfig(BaseModel):
     note_fetch = BooleanField(default=True)
     note_fetch_at = DateTimeTZField(null=True)
     note_refetch_at = DateTimeTZField(null=True)
-    note_next_fetch = DateTimeTZField(null=True)
     is_caching = BooleanField(default=True)
     post_cycle = IntegerField(null=True)
     age = TextField(null=True)
@@ -229,9 +228,6 @@ class UserConfig(BaseModel):
                 config.photos_num = 0
             if config.note_fetch_at:
                 config.post_cycle = config.get_post_cycle()
-                config.note_next_fetch = (
-                    config.note_fetch_at +
-                    pendulum.Duration(hours=2*config.post_cycle))
             config.save()
 
     async def fetch_note(self, download_dir: Path):
@@ -259,7 +255,6 @@ class UserConfig(BaseModel):
         if notes := self.user.notes.order_by(Note.time.desc()):
             self.post_at = notes.first().time
         self.post_cycle = self.get_post_cycle()
-        self.note_next_fetch = now.add(hours=2*self.post_cycle)
         if refetch:
             self.note_refetch_at = now
         self.notes_count = self.user.notes.count()
