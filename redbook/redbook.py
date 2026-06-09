@@ -247,7 +247,7 @@ def parse_note(note: dict) -> dict:
 
     pics, pic_ids = [], []
     for image in note.pop('image_list'):
-        image = {k: v for k, v in image.items() if (v is False or v) and k not in [
+        image: dict[str, str] = {k: v for k, v in image.items() if (v is False or v) and k not in [
             'height', 'width']}
         info_list = image.pop('info_list')
         assert all(len(i) == 2 for i in info_list)
@@ -255,13 +255,9 @@ def parse_note(note: dict) -> dict:
         assert (pic := image.pop('url_default')) == info_list.pop('WB_DFT')
         assert (pic_pre := image.pop('url_pre')) == info_list.pop('WB_PRV')
         assert not info_list
-        *pic, pic_id = pic.split('!')[0].split('/')
-        *pic_pre, pic_id_pre = pic_pre.split('!')[0].split('/')
-        assert pic_id == pic_id_pre
-        if (prefix := pic[-1]) in [
-                'spectrum', 'notes_pre_post', 'note_pre_post_uhdr', 'notes_uhdr']:
-            assert pic_pre[-1] == pic[-1]
-            pic_id = f'{prefix}/{pic_id}'
+        ptn = r'^https?://sns-webpic-qc\.xhscdn\.com/\d{12}/[a-f0-9]{32}/(.+?)!nd_[a-z0-9_]+$'
+        assert (pic_id := re.match(ptn, pic).group(
+            1)) == re.match(ptn, pic_pre).group(1)
         pic = f'http://sns-img-hw.xhscdn.com/{pic_id}?imageView2/2/w/100000/format/jpg'
         if image.pop('live_photo') is True:
             stream = {k: v for k, v in image.pop('stream').items() if v}
