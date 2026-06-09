@@ -7,12 +7,12 @@ from photosinfo.model import GirlSearch
 from playhouse.shortcuts import model_to_dict, update_model_from_dict
 from rich.prompt import Confirm
 from toolkit.model import (
-    ArrayField, BaseModel,
-    BooleanField,
+    ArrayField, BooleanField,
     DateTimeTZField,
     ForeignKeyField,
     IntegerField, JSONField,
-    TextField, get_database
+    TextField, get_base_model,
+    get_database
 )
 
 from redbook import console
@@ -28,6 +28,7 @@ from redbook.redbook import (
     parse_note, shorten_url
 )
 
+BaseModel = get_base_model()
 database = get_database('redbook')
 BaseModel.bind(database)
 
@@ -220,7 +221,7 @@ class UserConfig(BaseModel):
     @classmethod
     def update_table(cls):
         from photosinfo.model import Girl
-        for config in UserConfig:
+        for config in UserConfig.select():
             if girl := Girl.get_or_none(red_id=config.user_id):
                 config.photos_num = girl.red_num
                 config.folder = girl.folder
@@ -512,7 +513,7 @@ class Note(BaseModel):
             if live:
                 meta.append({
                     'url': live,
-                    'filename': f'{prefix}{live_tag}_{sn}.mov',
+                    'filename': f'{prefix}_{sn}{live_tag}.mov',
                     'filepath': filepath,
                     'xmp_info': self.gen_meta(sn=sn, url=live),
                 })
