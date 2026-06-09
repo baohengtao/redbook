@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pendulum
 from rich.prompt import Confirm, Prompt
+from toolkit.tool import asleep
 from typer import Typer
 
 from redbook import console
@@ -123,7 +124,7 @@ async def user_loop(frequency: float = 4,
             visit = fetcher.visits - visit
             sleep_time = visit * 30
             console.log(f'sleep {sleep_time} for {visit} visits')
-            await asyncio.sleep(sleep_time)
+            await asleep(sleep_time)
         await fetcher.aclose()
         next_start_time = pendulum.now().add(hours=frequency*random.uniform(0.8, 1.2))
         console.rule(f'waiting for next fetching at {next_start_time:%Y-%m-%d %H:%M:%S}',

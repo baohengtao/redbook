@@ -5,7 +5,7 @@ import time
 
 import httpx
 from httpx import AsyncClient, HTTPError, HTTPStatusError, Response
-from toolkit.tool import get_arc_cookies
+from toolkit.tool import asleep, get_arc_cookies
 
 from redbook import console
 from redbook.client_v2.xhs_util import generate_headers, splice_str
@@ -33,7 +33,7 @@ class Fetcher:
     def renew_client(self) -> None:
         console.log('renewing client...')
         self.cookies = get_arc_cookies(
-            'https://xiaohongshu.com', main_profile=True)
+            'https://xiaohongshu.com', main_profile=False)
         self.client = httpx.AsyncClient(cookies=self.cookies)
 
     async def login(self):
@@ -67,7 +67,7 @@ class Fetcher:
                     f"{e!r}: failed on {try_time}th trys, sleeping {period} "
                     f"seconds and retry [link={url}]{url}[/link]...",
                     style='info')
-                await asyncio.sleep(period)
+                await asleep(period)
             else:
                 return r
         raise ConnectionError('request failed')
@@ -109,6 +109,7 @@ class Fetcher:
                 f'sleep {wait_time:.1f} seconds...'
                 f'(count: {self._visit_count})',
                 style='info')
+            await asleep(wait_time)
         elif wait_time < -3600:
             self._visit_count = 0
             console.log(
@@ -119,12 +120,6 @@ class Fetcher:
             console.log(
                 f'no sleeping since more than {sleep_time:.1f} seconds passed'
                 f'(count: {self._visit_count})')
-        while time.time() < self._last_fetch:
-            try:
-                await asyncio.sleep(0.1)
-            except asyncio.CancelledError as e:
-                console.log('Cancelled on sleep', style='error')
-                raise KeyboardInterrupt from e
         self._last_fetch = time.time()
         self._visit_count += 1
 

@@ -221,7 +221,6 @@ def parse_note(note: dict) -> dict:
         assert note['following'] is False
     # relation = 'follows' if note['following'] else 'none'
     # assert relation == note.pop('relation')
-
     for k in ['time', 'last_update_time']:
         note[k] = pendulum.from_timestamp(note[k]/1000, tz='local')
 
