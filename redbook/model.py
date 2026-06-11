@@ -61,9 +61,6 @@ class User(BaseModel):
     account_deleted = BooleanField(default=False)
     search_results = GirlSearch.get_search_results()['red']
 
-    def __str__(self):
-        return super().__repr__()
-
     @classmethod
     async def from_id(cls, user_id: str, update=False) -> Self:
         if not (model := cls.get_or_none(id=user_id)) or update:
@@ -172,9 +169,6 @@ class UserConfig(BaseModel):
     folder = TextField(null=True)
     added_at = DateTimeTZField(null=True, default=pendulum.now)
     notes_count = IntegerField(default=0)
-
-    def __str__(self):
-        return super().__repr__()
 
     @classmethod
     async def from_id(cls, user_id: int) -> Self:
@@ -547,9 +541,6 @@ class Note(BaseModel):
         model.pop('pic_ids')
         return "\n".join(f'{k}: {v}' for k, v in model.items())
 
-    def __repr__(self):
-        return BaseModel.__repr__(self)
-
 
 class Artist(BaseModel):
     user = ForeignKeyField(User, unique=True, backref='artist')
@@ -573,9 +564,6 @@ class Artist(BaseModel):
 
     class Meta:
         table_name = "artist"
-
-    def __str__(self):
-        return super().__repr__()
 
     @classmethod
     def from_id(cls, user_id: int) -> Self:
