@@ -93,11 +93,9 @@ class User(BaseModel):
                 username = user_dict['nickname'].strip('-_ ')
             assert username
             user_dict['username'] = username
+            user_dict['short_url'] = await shorten_url(user_dict['homepage'])
             return cls.insert(user_dict).execute()
         model_dict = model_to_dict(model)
-        if not (model and model.short_url):
-            user_dict['short_url'] = await shorten_url(user_dict['homepage'])
-
         for k, v in user_dict.copy().items():
             assert v or v == 0
             if k in ['fans', 'follows', 'interaction']:
@@ -152,14 +150,15 @@ class UserConfig(BaseModel):
     user = ForeignKeyField(User, backref="config")
     red_id = TextField(unique=True)
     username = TextField()
+    short_url = TextField(null=True)
     note_fetch = BooleanField(default=True)
     note_fetch_at = DateTimeTZField(null=True)
     note_refetch_at = DateTimeTZField(null=True)
+    notes_count = IntegerField(default=0)
     is_caching = BooleanField(default=True)
     post_cycle = IntegerField(null=True)
     age = TextField(null=True)
     description = TextField(null=True)
-    homepage = TextField()
     following = BooleanField()
     location = TextField(null=True)
     ip_location = TextField(null=True)
@@ -168,7 +167,7 @@ class UserConfig(BaseModel):
     photos_num = IntegerField(null=True)
     folder = TextField(null=True)
     added_at = DateTimeTZField(null=True, default=pendulum.now)
-    notes_count = IntegerField(default=0)
+    homepage = TextField()
 
     @classmethod
     async def from_id(cls, user_id: int) -> Self:
